@@ -1,8 +1,22 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import AlgorithmView from '@/views/AlgorithmView.vue'
+import HomeView from '@/views/HomeView.vue'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [],
+  routes: [
+    {
+      path: '/',
+      name: 'home',
+      component: () => import('@/views/HomeView.vue'),
+    },
+    {
+      path: '/algorithm',
+      name: 'algorithm',
+      component: () => import('@/views/AlgorithmView.vue'),
+    },
+  ],
 })
 
 export default router
