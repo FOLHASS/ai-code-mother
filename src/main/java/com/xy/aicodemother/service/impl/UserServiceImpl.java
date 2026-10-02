@@ -106,7 +106,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
         queryWrapper.eq("userPassword", encryptedPassword);
         User user = this.mapper.selectOneByQuery(queryWrapper);
         if (user == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在或者密码不正确");
         }
         LoginUserVO loginUserVO = getUserVo(user);
 
@@ -128,8 +128,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
     @Override
     public List<UserVO> getUserVOList(List<User> userList) {
         if (userList != null) {
-            List<UserVO> userVOList = userList.stream().map(this::getUserVO).collect(Collectors.toList());
-            return userVOList;
+            return userList.stream().map(this::getUserVO).collect(Collectors.toList());
         }
         return List.of();
     }

@@ -9,14 +9,12 @@ import com.xy.aicodemother.constant.UserConstant;
 import com.xy.aicodemother.exception.ErrorCode;
 import com.xy.aicodemother.exception.ThrowUtils;
 import com.xy.aicodemother.model.dto.*;
-import com.xy.aicodemother.model.enums.UserRoleEnum;
 import com.xy.aicodemother.model.vo.LoginUserVO;
 import com.xy.aicodemother.model.vo.UserVO;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import com.xy.aicodemother.model.entity.User;
 import com.xy.aicodemother.service.UserService;
 
@@ -33,13 +31,12 @@ import java.util.List;
 public class UserController {
 
 
-
     @Resource
     private UserService userService;
 
 
     @PostMapping("/register")
-    public BaseResponse<Long> register(@RequestBody UserRegisterRequest userRegisterRequest){
+    public BaseResponse<Long> register(@RequestBody UserRegisterRequest userRegisterRequest) {
         ThrowUtils.throwIf(userRegisterRequest == null, ErrorCode.PARAMS_ERROR, "请求参数不能为空");
         String userAccount = userRegisterRequest.getUserAccount();
         String userPassword = userRegisterRequest.getUserPassword();
@@ -56,7 +53,7 @@ public class UserController {
     }
 
     @PostMapping("/get/login")
-    public BaseResponse<LoginUserVO> getLoginUser(HttpServletRequest request){
+    public BaseResponse<LoginUserVO> getLoginUser(HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
         return ResultUtils.success(userService.getUserVo(loginUser));
     }
@@ -100,7 +97,7 @@ public class UserController {
     }
 
     @PostMapping("/get/vo")
-    public BaseResponse<UserVO> getUserVo(long id){
+    public BaseResponse<UserVO> getUserVo(long id) {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
         User user = userService.getById(id);
         ThrowUtils.throwIf(user == null, ErrorCode.NOT_FOUND_ERROR);
@@ -108,7 +105,7 @@ public class UserController {
     }
 
 
-    @PostMapping("update")
+    @PostMapping("/update")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> updateUser(@RequestBody UserUpdateRequest userUpdateRequest) {
         ThrowUtils.throwIf(userUpdateRequest == null, ErrorCode.PARAMS_ERROR);
@@ -130,7 +127,7 @@ public class UserController {
         // 在数据库当中进行分页查询
         Page<User> userPage = userService.page(Page.of(pageNum, pageSize), userService.getQueryWrapper(userQueryRequest));
         // 设置分页查询到基本参数【页数，每页大小，总行数】
-        Page<UserVO> userVOPage = new Page<UserVO>(pageNum, pageSize, userPage.getTotalRow());
+        Page<UserVO> userVOPage = new Page<>(pageNum, pageSize, userPage.getTotalRow());
         // 转换用户数据为用户VO脱敏数据
         List<UserVO> userVOList = userService.getUserVOList(userPage.getRecords());
         // 由于返回的为Page容器，故设置
