@@ -5,13 +5,18 @@ import { useRouter } from 'vue-router'
 
 import GlobalFooter from '@/components/GlobalFooter.vue'
 import GlobalHeader from '@/components/GlobalHeader.vue'
+import { useLoginUserStore } from '@/stores/loginUserStore.ts'
 
 const router = useRouter()
+const loginUserStore = useLoginUserStore()
 
 // Add or remove entries here to configure the global navigation menu.
 const menuItems: MenuProps['items'] = [
   { key: '/', label: '首页' },
   { key: '/algorithm', label: '算法' },
+  ...(loginUserStore.loginUser.userRole === 'admin'
+    ? [{ key: '/admin/userManage', label: '用户管理' }]
+    : []),
 ]
 
 const handleMenuSelect = (key: string) => {

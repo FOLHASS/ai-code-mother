@@ -1,0 +1,8 @@
+langchain4j:
+  open-ai:
+    chat-model:
+      api-key: sk-cae80a520c434563851ea299fa55b894
+      base-url: https://api.deepseek.com
+      model-name: deepseek-flash
+      log-responses: true
+      log-requests: true

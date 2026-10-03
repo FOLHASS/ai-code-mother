@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Menu, Button } from 'ant-design-vue'
+import { Avatar, Button, Dropdown, Menu } from 'ant-design-vue'
 import type { MenuProps } from 'ant-design-vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import logoUrl from '@/assets/logo.png'
+import { useLoginUserStore } from '@/stores/loginUserStore.ts'
+import { logout } from '@/api/userController.ts'
 
 defineProps<{
   menuItems: MenuProps['items']
@@ -14,12 +16,38 @@ const emit = defineEmits<{
   select: [key: string]
 }>()
 
+const loginUserStore = useLoginUserStore()
+const router = useRouter()
+
 const route = useRoute()
 const selectedKeys = computed(() => [route.path])
+const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser.id))
+const displayName = computed(
+  () => loginUserStore.loginUser.userName || loginUserStore.loginUser.userAccount || '用户',
+)
+
+const userMenuItems: MenuProps['items'] = [
+  { key: 'profile', label: '个人信息' },
+  { type: 'divider' },
+  { key: 'logout', label: '退出登录' },
+]
 
 const handleMenuClick = ({ key }: { key: string | number }) => {
   if (typeof key === 'string') {
     emit('select', key)
+  }
+}
+
+const handleUserMenuClick = async ({ key }: { key: string | number }) => {
+  if (key === 'profile') {
+    await router.push('/user/profile')
+    return
+  }
+
+  if (key === 'logout') {
+    await logout()
+    loginUserStore.setLoginUser({ userName: '未登录' })
+    await router.push('/user/login')
   }
 }
 </script>
@@ -41,7 +69,30 @@ const handleMenuClick = ({ key }: { key: string | number }) => {
         @click="handleMenuClick"
       />
 
-      <Button class="login-button" type="primary" ghost>登录</Button>
+      <div class="user-area">
+        <Button
+          v-if="!isLoggedIn"
+          class="login-button"
+          type="primary"
+          ghost
+          @click="router.push('/user/login')"
+        >
+          登录
+        </Button>
+
+        <Dropdown v-else placement="bottomRight" :trigger="['click']">
+          <button class="user-trigger" type="button" aria-label="打开用户菜单">
+            <Avatar :src="loginUserStore.loginUser.userAvatar" :size="32">
+              {{ displayName.slice(0, 1).toUpperCase() }}
+            </Avatar>
+            <span class="user-name">{{ displayName }}</span>
+          </button>
+
+          <template #overlay>
+            <Menu :items="userMenuItems" @click="handleUserMenuClick" />
+          </template>
+        </Dropdown>
+      </div>
     </div>
   </header>
 </template>
@@ -102,8 +153,37 @@ const handleMenuClick = ({ key }: { key: string | number }) => {
   justify-content: flex-start;
 }
 
-.login-button {
+.user-area {
   flex: 0 0 auto;
+}
+
+.user-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 8px;
+  color: #1f1f1f;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.user-trigger:hover,
+.user-trigger:focus-visible {
+  background: #f5f5f5;
+  outline: none;
+}
+
+.user-name {
+  max-width: 140px;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 768px) {
@@ -117,6 +197,10 @@ const handleMenuClick = ({ key }: { key: string | number }) => {
 
   .brand-title {
     font-size: 16px;
+  }
+
+  .user-name {
+    max-width: 96px;
   }
 
   .global-menu {
