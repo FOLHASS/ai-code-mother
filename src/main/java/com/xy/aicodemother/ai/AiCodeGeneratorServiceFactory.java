@@ -1,6 +1,7 @@
 package com.xy.aicodemother.ai;
 
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
@@ -14,6 +15,9 @@ public class AiCodeGeneratorServiceFactory {
     @Resource
     private ChatModel chatModel;
 
+    @Resource
+    private StreamingChatModel streamingChatModel;
+
     /**
      * 创建AI代码生成器服务
      * @return
@@ -21,8 +25,9 @@ public class AiCodeGeneratorServiceFactory {
     @Bean
     AiCodeGeneratorService aiCodeGeneratorService() {
         // 也可以指定流式输出的模型
-
-
-        return AiServices.create(AiCodeGeneratorService.class, chatModel);
+        return AiServices.builder(AiCodeGeneratorService.class)
+                .chatModel(chatModel)
+                .streamingChatModel(streamingChatModel)
+                .build();
     }
 }

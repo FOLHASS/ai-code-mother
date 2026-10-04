@@ -5,8 +5,10 @@ import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import reactor.core.publisher.Flux;
 
 import java.io.File;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -17,7 +19,14 @@ class AiCodeGeneratorFacadeTest {
 
     @Test
     void generatorAndSaveCode() {
-        File file = aiCodeGeneratorFacade.generatorAndSaveCode("帮我一个烟花效果的页面", CodeGenTypeEnum.MULTI_FILE);
+        File file = aiCodeGeneratorFacade.generatorAndSaveCode("帮我生成一份简历 控制在100kToken范围内", CodeGenTypeEnum.HTML);
         Assertions.assertNotNull(file);
+    }
+
+    @Test
+    void generatorAndSaveCodeStreaming() {
+        Flux<String> flux = aiCodeGeneratorFacade.generatorAndSaveCodeStreaming("帮我生成一份简历 控制在100kToken范围内", CodeGenTypeEnum.HTML);
+        List<String> stringList = flux.collectList().block();
+        Assertions.assertNotNull(stringList);
     }
 }
