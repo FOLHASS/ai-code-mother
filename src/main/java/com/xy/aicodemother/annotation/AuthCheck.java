@@ -10,6 +10,4 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)  // 设置运行时生效
 public @interface AuthCheck {
     String mustRole() default "";
-
-
 }

@@ -60,9 +60,5 @@ public class AuthInterceptor {
 
         // 否则 直接放行
         return joinPoint.proceed();
-
-
-
-
     }
 }
