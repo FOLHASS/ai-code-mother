@@ -19,13 +19,13 @@ class AiCodeGeneratorFacadeTest {
 
     @Test
     void generatorAndSaveCode() {
-        File file = aiCodeGeneratorFacade.generatorAndSaveCode("帮我生成一份简历 控制在100kToken范围内", CodeGenTypeEnum.HTML);
+        File file = aiCodeGeneratorFacade.generateAndSaveCode("帮我生成一份简历 控制在100kToken范围内", CodeGenTypeEnum.MULTI_FILE);
         Assertions.assertNotNull(file);
     }
 
     @Test
     void generatorAndSaveCodeStreaming() {
-        Flux<String> flux = aiCodeGeneratorFacade.generatorAndSaveCodeStreaming("帮我生成一份简历 控制在100kToken范围内", CodeGenTypeEnum.HTML);
+        Flux<String> flux = aiCodeGeneratorFacade.generateAndSaveCodeStream("帮我生成一份简历 总代码量不超过十行", CodeGenTypeEnum.HTML);
         List<String> stringList = flux.collectList().block();
         Assertions.assertNotNull(stringList);
     }

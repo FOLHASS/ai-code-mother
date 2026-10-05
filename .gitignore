@@ -1,5 +1,6 @@
 ### custom
 /src/main/resources/application-local.yml
+/src/main/resources/application-glm.yml
 tmp
 
 

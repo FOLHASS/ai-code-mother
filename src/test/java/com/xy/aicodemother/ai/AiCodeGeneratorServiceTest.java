@@ -20,7 +20,7 @@ class AiCodeGeneratorServiceTest {
 
     @Test
     void generateCode() {
-       HtmlCodeResult result = aiCodeGeneratorService.generateCode("做个程序员鱼皮的博客");
+       HtmlCodeResult result = aiCodeGeneratorService.generateHtmlCode("做个程序员鱼皮的博客");
         Assertions.assertNotNull(result);
     }
 

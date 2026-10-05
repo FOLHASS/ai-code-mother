@@ -1,46 +1,19 @@
-package com.xy.aicodemother.core;
+package com.xy.aicodemother.core.parser;
 
-import com.xy.aicodemother.ai.model.HtmlCodeResult;
 import com.xy.aicodemother.ai.model.MultiFileCodeResult;
+import com.xy.aicodemother.model.enums.CodeGenTypeEnum;
 
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-/**
- * 代码解析器。
- */
-public final class CodeParser {
-
-    /**
-     * 单文件解析使用：
-     * 结束标记必须独占一行，避免误截断代码中的反引号。
-     */
-    private static final Pattern HTML_CODE_PATTERN = Pattern.compile(
-            "^```html[\\t ]*\\n([\\s\\S]*?)^```[\\t ]*$",
-            Pattern.MULTILINE | Pattern.CASE_INSENSITIVE
-    );
-
-    private CodeParser() {
+public class MultiFileCodeParseStrategy extends CodeParseStrategy<MultiFileCodeResult>{
+    @Override
+    boolean support(CodeGenTypeEnum codeGenTypeEnum) {
+        return codeGenTypeEnum.equals(CodeGenTypeEnum.MULTI_FILE);
     }
 
-    /**
-     * 解析 HTML 单文件代码。
-     * 支持 Markdown HTML 代码块，以及直接返回的 HTML。
-     */
-    public static HtmlCodeResult parseHtmlCode(String codeContent) {
-        String content = normalize(codeContent);
-
-        Matcher matcher = HTML_CODE_PATTERN.matcher(content);
-        String htmlCode = matcher.find()
-                ? matcher.group(1).strip()
-                : content.strip();
-
-        validateHtml(htmlCode);
-
-        HtmlCodeResult result = new HtmlCodeResult();
-        result.setHtmlCode(htmlCode);
-        return result;
+    @Override
+    MultiFileCodeResult parse(String content) {
+        return parseMultiFileCode(content);
     }
 
     /**
@@ -56,7 +29,7 @@ public final class CodeParser {
      *
      * @throws IllegalArgumentException 格式不符合要求
      */
-    public static MultiFileCodeResult parseMultiFileCode(
+    public MultiFileCodeResult parseMultiFileCode(
             String codeContent) {
 
         Cursor cursor = new Cursor(normalize(codeContent));
@@ -78,42 +51,6 @@ public final class CodeParser {
         result.setCssCode(cssCode);
         result.setJsCode(jsCode);
         return result;
-    }
-
-    /**
-     * 统一换行符，并移除文本开头可能存在的 BOM。
-     */
-    private static String normalize(String content) {
-        if (content == null || content.isBlank()) {
-            throw new IllegalArgumentException("待解析内容不能为空");
-        }
-
-        String normalized = content
-                .replace("\r\n", "\n")
-                .replace('\r', '\n');
-
-        if (normalized.startsWith("\uFEFF")) {
-            normalized = normalized.substring(1);
-        }
-
-        return normalized;
-    }
-
-    /**
-     * 检查 HTML 首尾标记，不执行 HTML 语法验证。
-     */
-    private static void validateHtml(String htmlCode) {
-        if (!htmlCode.startsWith("<!DOCTYPE html>")) {
-            throw new IllegalArgumentException(
-                    "index.html 必须以 <!DOCTYPE html> 开始"
-            );
-        }
-
-        if (!htmlCode.endsWith("</html>")) {
-            throw new IllegalArgumentException(
-                    "index.html 必须以 </html> 结束"
-            );
-        }
     }
 
     /**
