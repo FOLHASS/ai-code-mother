@@ -13,7 +13,6 @@ const loginUserStore = useLoginUserStore()
 // Add or remove entries here to configure the global navigation menu.
 const menuItems: MenuProps['items'] = [
   { key: '/', label: '首页' },
-  { key: '/algorithm', label: '算法' },
   ...(loginUserStore.loginUser.userRole === 'admin'
     ? [{ key: '/admin/userManage', label: '用户管理' }]
     : []),
@@ -48,12 +47,12 @@ const handleMenuSelect = (key: string) => {
 }
 
 :global(body) {
-  background: #f5f5f5;
+  background: #f7faff;
 }
 
 .basic-layout {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: #f7faff;
 }
 
 .basic-content {
@@ -62,16 +61,16 @@ const handleMenuSelect = (key: string) => {
 }
 
 .content-container {
-  width: min(1200px, calc(100% - 48px));
-  min-height: 240px;
+  width: min(1280px, calc(100% - 56px));
+  min-height: 320px;
   margin: 0 auto;
-  padding: 32px 0;
+  padding: 42px 0 64px;
 }
 
 @media (max-width: 768px) {
   .content-container {
-    width: min(100% - 32px, 1200px);
-    padding: 24px 0;
+    width: min(100% - 32px, 1280px);
+    padding: 28px 0 48px;
   }
 }
 </style>

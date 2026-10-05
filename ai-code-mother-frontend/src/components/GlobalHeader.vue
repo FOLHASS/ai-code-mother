@@ -100,17 +100,18 @@ const handleUserMenuClick = async ({ key }: { key: string | number }) => {
 <style scoped>
 .global-header {
   flex: 0 0 auto;
-  padding: 0 24px;
-  background: #fff;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 0 28px;
+  background: rgb(255 255 255 / 90%);
+  border-bottom: 1px solid #eaf0f6;
+  box-shadow: 0 4px 18px rgb(37 85 139 / 4%);
 }
 
 .header-inner {
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-height: 64px;
-  max-width: 1200px;
+  gap: 24px;
+  min-height: 68px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
@@ -125,14 +126,15 @@ const handleUserMenuClick = async ({ key }: { key: string | number }) => {
 }
 
 .brand-logo {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   object-fit: contain;
   border-radius: 8px;
 }
 
 .brand-title {
-  font-size: 18px;
+  color: #1b3554;
+  font-size: 17px;
   font-weight: 600;
 }
 
@@ -147,6 +149,20 @@ const handleUserMenuClick = async ({ key }: { key: string | number }) => {
 .global-menu :deep(.ant-menu-item-selected),
 .global-menu :deep(.ant-menu-item:hover) {
   background: transparent;
+}
+
+.global-menu :deep(.ant-menu-item) {
+  color: #6c7d91;
+  font-size: 14px;
+}
+
+.global-menu :deep(.ant-menu-item-selected) {
+  color: #2478d6;
+  font-weight: 600;
+}
+
+.global-menu :deep(.ant-menu-item::after) {
+  border-bottom-color: #2478d6;
 }
 
 .global-menu :deep(.ant-menu-overflow) {
@@ -173,7 +189,7 @@ const handleUserMenuClick = async ({ key }: { key: string | number }) => {
 
 .user-trigger:hover,
 .user-trigger:focus-visible {
-  background: #f5f5f5;
+  background: #f1f7ff;
   outline: none;
 }
 

@@ -1,0 +1,346 @@
+package com.xy.aicodemother.service.impl;
+
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
+import com.mybatisflex.core.paginate.Page;
+import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.spring.service.impl.ServiceImpl;
+import com.xy.aicodemother.constant.AppConstant;
+import com.xy.aicodemother.core.AiCodeGeneratorFacade;
+import com.xy.aicodemother.exception.BusinessException;
+import com.xy.aicodemother.exception.ErrorCode;
+import com.xy.aicodemother.exception.ThrowUtils;
+import com.xy.aicodemother.mapper.AppMapper;
+import com.xy.aicodemother.model.dto.app.AppAddRequest;
+import com.xy.aicodemother.model.dto.app.AppAdminUpdateRequest;
+import com.xy.aicodemother.model.dto.app.AppQueryRequest;
+import com.xy.aicodemother.model.dto.app.AppUpdateRequest;
+import com.xy.aicodemother.model.entity.App;
+import com.xy.aicodemother.model.entity.User;
+import com.xy.aicodemother.model.enums.CodeGenTypeEnum;
+import com.xy.aicodemother.model.vo.AppVO;
+import com.xy.aicodemother.model.vo.UserVO;
+import com.xy.aicodemother.service.AppService;
+import com.xy.aicodemother.service.UserService;
+import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * 应用服务实现。
+ *
+ * <p>这里集中处理应用的业务规则：创建时补齐系统字段，普通用户操作时
+ * 校验应用归属，分页查询时限制普通用户 pageSize，并将实体转换成脱敏 VO。</p>
+ */
+@Service
+@Slf4j
+public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppService {
+
+    /**
+     * 用户服务用于查询当前应用的创建者，并生成脱敏用户信息。
+     */
+    @Resource
+    private UserService userService;
+    @Resource
+    private AiCodeGeneratorFacade aiCodeGeneratorFacade;
+
+
+    @Override
+    public Flux<ServerSentEvent<String>> chatToGenCode(Long appId, String userMessage, User loginUser) {
+        ThrowUtils.throwIf(StrUtil.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "生成需求不能为空");
+
+        // 仅应用创建者可以触发代码生成。
+        App app = getOwnedApp(appId, loginUser);
+        CodeGenTypeEnum codeGenType = CodeGenTypeEnum.getEnumByValue(app.getCodeGenType());
+
+        // 使用非流式生成入口；该调用会等待 AI 返回、代码解析和文件保存全部完成。
+        return aiCodeGeneratorFacade.generateAndSaveCodeStream(userMessage, codeGenType, appId)
+                .map(chunk -> {
+                    Map<String, String> wrapper = Map.of("d", chunk);
+                    String jsonStr = JSONUtil.toJsonStr(wrapper);
+                    return ServerSentEvent.<String>builder()
+                            .data(jsonStr)
+                            .build();
+                }).concatWith(Mono.just(
+                        ServerSentEvent.<String>builder()
+                                .event("done")
+                                .data("")
+                                .build()
+                ));
+    }
+
+    /**
+     * 创建应用。
+     *
+     * <p>当前项目暂未接入“根据 prompt 自动选择代码生成类型”的路由服务，
+     * 因此统一使用已有的多文件模式，确保 codeGenType 一定是合法枚举值，
+     * 后续代码生成和保存流程不会因为类型为空而失败。</p>
+     */
+    @Override
+    public long createApp(AppAddRequest appAddRequest, User loginUser) {
+        ThrowUtils.throwIf(appAddRequest == null, ErrorCode.PARAMS_ERROR, "请求参数为空");
+        Long userId = getLoginUserId(loginUser);
+
+        // 初始化 prompt 是创建应用的唯一必填业务字段。
+        String initPrompt = StrUtil.trim(appAddRequest.getInitPrompt());
+        ThrowUtils.throwIf(StrUtil.isBlank(initPrompt), ErrorCode.PARAMS_ERROR,
+                "应用初始化 prompt 不能为空");
+
+        // 构造实体时只写入后端允许用户提交和系统负责生成的字段。
+        App app = new App();
+        app.setUserId(userId);
+        app.setInitPrompt(initPrompt);
+
+        // 暂时使用 prompt 前 12 个字符作为默认应用名称，避免创建后名称为空。
+        app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
+
+        // 当前系统支持 html 和 multi_file 两种类型，这里选择已有的多文件模式。
+        app.setCodeGenType(CodeGenTypeEnum.MULTI_FILE.getValue());
+        app.setPriority(AppConstant.DEFAULT_APP_PRIORITY);
+
+        boolean saveResult = this.save(app);
+        ThrowUtils.throwIf(!saveResult, ErrorCode.OPERATION_ERROR, "应用创建失败");
+        log.info("应用创建成功，appId={}, userId={}", app.getId(), loginUser.getId());
+        return app.getId();
+    }
+
+    @Override
+    public boolean updateApp(AppUpdateRequest appUpdateRequest, User loginUser) {
+        ThrowUtils.throwIf(appUpdateRequest == null, ErrorCode.PARAMS_ERROR, "请求参数为空");
+        getOwnedApp(appUpdateRequest.getId(), loginUser);
+
+        String appName = StrUtil.trim(appUpdateRequest.getAppName());
+        ThrowUtils.throwIf(StrUtil.isBlank(appName), ErrorCode.PARAMS_ERROR, "应用名称不能为空");
+
+        App app = new App();
+        app.setId(appUpdateRequest.getId());
+        app.setAppName(appName);
+        app.setEditTime(LocalDateTime.now());
+        boolean result = this.updateById(app);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "应用更新失败");
+        return true;
+    }
+
+    @Override
+    public boolean deleteApp(Long appId, User loginUser) {
+        getOwnedApp(appId, loginUser);
+        return adminDeleteApp(appId);
+    }
+
+    @Override
+    public AppVO getAppVOById(Long appId, User loginUser) {
+        return getAppVO(getOwnedApp(appId, loginUser));
+    }
+
+    @Override
+    public Page<AppVO> listMyAppVOByPage(AppQueryRequest appQueryRequest, User loginUser) {
+        validatePageRequest(appQueryRequest, true);
+        Long userId = getLoginUserId(loginUser);
+
+        // 覆盖客户端提交的归属条件，同时保留原请求，避免业务方法修改调用方的数据。
+        AppQueryRequest queryRequest = new AppQueryRequest();
+        BeanUtils.copyProperties(appQueryRequest, queryRequest);
+        queryRequest.setUserId(userId);
+        return pageAppVO(queryRequest, getQueryWrapper(queryRequest));
+    }
+
+    @Override
+    public Page<AppVO> listGoodAppVOByPage(AppQueryRequest appQueryRequest) {
+        validatePageRequest(appQueryRequest, true);
+        return pageAppVO(appQueryRequest, getGoodAppQueryWrapper(appQueryRequest));
+    }
+
+    @Override
+    public boolean adminDeleteApp(Long appId) {
+        getExistingApp(appId);
+        boolean result = this.removeById(appId);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "应用删除失败");
+        return true;
+    }
+
+    @Override
+    public boolean adminUpdateApp(AppAdminUpdateRequest appAdminUpdateRequest) {
+        ThrowUtils.throwIf(appAdminUpdateRequest == null, ErrorCode.PARAMS_ERROR, "请求参数为空");
+        getExistingApp(appAdminUpdateRequest.getId());
+
+        App app = new App();
+        app.setId(appAdminUpdateRequest.getId());
+        if (appAdminUpdateRequest.getAppName() != null) {
+            String appName = StrUtil.trim(appAdminUpdateRequest.getAppName());
+            ThrowUtils.throwIf(StrUtil.isBlank(appName), ErrorCode.PARAMS_ERROR, "应用名称不能为空");
+            app.setAppName(appName);
+        }
+        app.setCover(appAdminUpdateRequest.getCover());
+        app.setPriority(appAdminUpdateRequest.getPriority());
+        app.setEditTime(LocalDateTime.now());
+        boolean result = this.updateById(app);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "应用更新失败");
+        return true;
+    }
+
+    @Override
+    public Page<AppVO> adminListAppVOByPage(AppQueryRequest appQueryRequest) {
+        validatePageRequest(appQueryRequest, false);
+        return pageAppVO(appQueryRequest, getQueryWrapper(appQueryRequest));
+    }
+
+    @Override
+    public AppVO adminGetAppVOById(Long appId) {
+        return getAppVO(getExistingApp(appId));
+    }
+
+    /**
+     * 校验登录用户；服务层不依赖 HTTP 请求或 Session。
+     */
+    private Long getLoginUserId(User loginUser) {
+        ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null,
+                ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
+        return loginUser.getId();
+    }
+
+    /**
+     * 查询应用并统一校验 id 和存在性。
+     */
+    private App getExistingApp(Long appId) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 id 不合法");
+        App app = this.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        return app;
+    }
+
+    /**
+     * 普通用户的查看、修改和删除统一校验应用归属。
+     */
+    private App getOwnedApp(Long appId, User loginUser) {
+        Long userId = getLoginUserId(loginUser);
+        App app = getExistingApp(appId);
+        ThrowUtils.throwIf(!userId.equals(app.getUserId()), ErrorCode.NO_AUTH_ERROR, "无权操作该应用");
+        return app;
+    }
+
+    /**
+     * 分页参数校验；普通用户和公开精选列表限制单页数量。
+     */
+    private void validatePageRequest(AppQueryRequest appQueryRequest, boolean limitPageSize) {
+        ThrowUtils.throwIf(appQueryRequest == null, ErrorCode.PARAMS_ERROR, "请求参数为空");
+        ThrowUtils.throwIf(appQueryRequest.getPageNum() <= 0 || appQueryRequest.getPageSize() <= 0,
+                ErrorCode.PARAMS_ERROR, "分页参数不合法");
+        ThrowUtils.throwIf(limitPageSize && appQueryRequest.getPageSize() > AppConstant.USER_APP_MAX_PAGE_SIZE,
+                ErrorCode.PARAMS_ERROR, "每页最多查询 " + AppConstant.USER_APP_MAX_PAGE_SIZE + " 个应用");
+    }
+
+    /**
+     * 查询并转换分页结果，复用批量用户查询，保留分页元数据。
+     */
+    private Page<AppVO> pageAppVO(AppQueryRequest appQueryRequest, QueryWrapper queryWrapper) {
+        Page<App> appPage = this.page(
+                Page.of(appQueryRequest.getPageNum(), appQueryRequest.getPageSize()), queryWrapper);
+        Page<AppVO> appVOPage = new Page<>(appPage.getPageNumber(), appPage.getPageSize(), appPage.getTotalRow());
+        appVOPage.setRecords(getAppVOList(appPage.getRecords()));
+        return appVOPage;
+    }
+
+    /**
+     * 将应用实体转换为脱敏 VO。
+     */
+    @Override
+    public AppVO getAppVO(App app) {
+        if (app == null) {
+            return null;
+        }
+
+        AppVO appVO = new AppVO();
+        BeanUtils.copyProperties(app, appVO);
+
+        // 应用创建者信息只返回 UserVO，避免把密码等实体字段带到前端。
+        if (app.getUserId() != null) {
+            User user = userService.getById(app.getUserId());
+            UserVO userVO = userService.getUserVO(user);
+            appVO.setUser(userVO);
+        }
+        return appVO;
+    }
+
+    /**
+     * 批量转换应用 VO，并批量查询用户，避免列表页面出现 N+1 次用户查询。
+     */
+    @Override
+    public List<AppVO> getAppVOList(List<App> appList) {
+        if (appList == null || appList.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 收集所有创建者 id，并去重后一次性查询。
+        Set<Long> userIds = appList.stream()
+                .map(App::getUserId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        Map<Long, UserVO> userVOMap = userIds.isEmpty()
+                ? Collections.emptyMap()
+                : userService.listByIds(userIds).stream()
+                .collect(Collectors.toMap(User::getId, userService::getUserVO,
+                        (oldValue, newValue) -> oldValue));
+
+        return appList.stream().map(app -> {
+            AppVO appVO = new AppVO();
+            BeanUtils.copyProperties(app, appVO);
+            appVO.setUser(userVOMap.get(app.getUserId()));
+            return appVO;
+        }).collect(Collectors.toList());
+    }
+
+    /**
+     * 构造管理员和普通查询共用的应用条件。
+     */
+    @Override
+    public QueryWrapper getQueryWrapper(AppQueryRequest appQueryRequest) {
+        if (appQueryRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
+        }
+
+        return QueryWrapper.create()
+                // 精确匹配的字段
+                .eq("id", appQueryRequest.getId())
+                .eq("codeGenType", appQueryRequest.getCodeGenType())
+                .eq("deployKey", appQueryRequest.getDeployKey())
+                .eq("priority", appQueryRequest.getPriority())
+                .eq("userId", appQueryRequest.getUserId())
+                // 文本字段使用模糊匹配，便于后台检索应用。
+                .like("appName", appQueryRequest.getAppName())
+                .like("cover", appQueryRequest.getCover())
+                .like("initPrompt", appQueryRequest.getInitPrompt())
+                .orderBy(appQueryRequest.getSortField(), "ascend".equals(appQueryRequest.getSortOrder()));
+    }
+
+    /**
+     * 构造精选应用查询条件。
+     *
+     * <p>精选列表目前只接受应用名称搜索，其余业务条件由服务端固定，
+     * 避免调用方提交 priority=0 等条件后绕开精选规则。</p>
+     */
+    @Override
+    public QueryWrapper getGoodAppQueryWrapper(AppQueryRequest appQueryRequest) {
+        if (appQueryRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
+        }
+
+        return QueryWrapper.create()
+                .eq("priority", AppConstant.GOOD_APP_PRIORITY)
+                .like("appName", appQueryRequest.getAppName())
+                .orderBy(appQueryRequest.getSortField(), "ascend".equals(appQueryRequest.getSortOrder()));
+    }
+
+
+
+}

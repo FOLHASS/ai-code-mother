@@ -1,9 +1,9 @@
 <template>
   <footer class="global-footer">
-    编程导航原创项目 by
-    <a href="https://www.codefather.cn" target="_blank" rel="noopener noreferrer">
-      程序员鱼皮
-    </a>
+<!--    编程导航原创项目 by-->
+<!--    <a href="https://www.codefather.cn" target="_blank" rel="noopener noreferrer">-->
+<!--      程序员鱼皮-->
+<!--    </a>-->
   </footer>
 </template>
 

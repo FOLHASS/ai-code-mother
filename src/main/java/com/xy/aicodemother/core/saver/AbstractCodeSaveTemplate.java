@@ -14,11 +14,11 @@ public abstract class AbstractCodeSaveTemplate<T>{
     // 文件保存根目录
     private static final String FILE_SAVE_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_output";
 
-    public final File saveCode(T result){
+    public final File saveCode(T result, long appId){
         // 1. 验证输入
         validateInput(result);
         // 2. 生成唯一的文件目录
-        String baseDirPath = buildUniqueDir();
+        String baseDirPath = buildUniqueDir(appId);
         // 3. 保存文件
         saveFiles(result, baseDirPath);
         // 返回文件
@@ -33,8 +33,8 @@ public abstract class AbstractCodeSaveTemplate<T>{
     /**
      * 构建唯一目录路径：tmp/code_output/bizType_雪花ID
      */
-    protected final String buildUniqueDir() {
-        String uniqueDirName = StrUtil.format("{}_{}", getCodeType(), IdUtil.getSnowflakeNextIdStr());
+    protected final String buildUniqueDir(long appId) {
+        String uniqueDirName = StrUtil.format("{}_{}", getCodeType(), appId);
         String dirPath = FILE_SAVE_ROOT_DIR + File.separator + uniqueDirName;
         FileUtil.mkdir(dirPath);
         return dirPath;

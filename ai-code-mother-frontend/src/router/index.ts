@@ -15,11 +15,6 @@ const router = createRouter({
           component: () => import('@/pages/HomePage.vue'),
         },
         {
-          path: 'algorithm',
-          name: 'algorithm',
-          component: () => import('@/pages/AlgorithmPage.vue'),
-        },
-        {
           path: 'admin/userManage',
           name: 'AdminUserManagePage',
           component: () => import('@/pages/admin/UserManagePage.vue'),

@@ -11,7 +11,7 @@ import java.util.Map;
 
 public class Codegen {
 
-    public static final String[] TABLE_NAMES = {"user"};
+    public static final String[] TABLE_NAMES = {"app"};
 
     public static void main(String[] args) {
         Dict dict = YamlUtil.loadByPath("application.yml");
