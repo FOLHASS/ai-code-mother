@@ -24,6 +24,15 @@ import java.util.List;
 public interface AppService extends IService<App> {
 
     /**
+     * 部署应用。
+     * @param appId
+     * @param loginUser
+     * @return
+     */
+    String deployApp(Long appId, User loginUser);
+
+
+    /**
      * 创建应用。
      *
      * @param appAddRequest 创建请求，只接收初始化 prompt

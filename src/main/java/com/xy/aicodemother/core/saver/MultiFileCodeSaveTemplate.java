@@ -5,8 +5,8 @@ import com.xy.aicodemother.model.enums.CodeGenTypeEnum;
 
 public class MultiFileCodeSaveTemplate extends AbstractCodeSaveTemplate<MultiFileCodeResult>{
     @Override
-    protected CodeGenTypeEnum getCodeType() {
-        return CodeGenTypeEnum.MULTI_FILE;
+    protected String getCodeType() {
+        return CodeGenTypeEnum.MULTI_FILE.getValue();
     }
 
     @Override

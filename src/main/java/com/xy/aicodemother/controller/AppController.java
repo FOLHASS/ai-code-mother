@@ -6,6 +6,8 @@ import com.xy.aicodemother.common.BaseResponse;
 import com.xy.aicodemother.common.DeleteRequest;
 import com.xy.aicodemother.common.ResultUtils;
 import com.xy.aicodemother.constant.UserConstant;
+import com.xy.aicodemother.exception.ErrorCode;
+import com.xy.aicodemother.exception.ThrowUtils;
 import com.xy.aicodemother.model.dto.app.AppAddRequest;
 import com.xy.aicodemother.model.dto.app.AppAdminUpdateRequest;
 import com.xy.aicodemother.model.dto.app.AppQueryRequest;
@@ -55,6 +57,15 @@ public class AppController {
                                                        HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
         return appService.chatToGenCode(appId, message, loginUser);
+    }
+
+
+    @PostMapping("deploy")
+    public BaseResponse<String> deploy(@RequestParam Long appId,
+                                      HttpServletRequest request) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 id 不合法");
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(appService.deployApp(appId, loginUser));
     }
 
     /**

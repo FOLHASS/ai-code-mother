@@ -5,8 +5,8 @@ import com.xy.aicodemother.model.enums.CodeGenTypeEnum;
 
 public class HtmlCodeSaveTemplate extends AbstractCodeSaveTemplate<HtmlCodeResult>{
     @Override
-    protected CodeGenTypeEnum getCodeType() {
-        return CodeGenTypeEnum.HTML;
+    protected String getCodeType() {
+        return CodeGenTypeEnum.HTML.getValue();
     }
 
     @Override

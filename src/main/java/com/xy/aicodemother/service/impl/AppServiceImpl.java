@@ -1,5 +1,7 @@
 package com.xy.aicodemother.service.impl;
 
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
@@ -30,6 +32,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.File;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -78,6 +81,58 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                                 .data("")
                                 .build()
                 ));
+    }
+
+    /**
+     * 部署应用。
+     * @param appId
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public String deployApp(Long appId, User loginUser) {
+        ThrowUtils.throwIf(appId == null, ErrorCode.PARAMS_ERROR, "应用 id 不能为空");
+        getOwnedApp(appId, loginUser);
+
+        App app = getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        // 检查是否已有deployKey
+        String deployKey = app.getDeployKey();
+        if (StrUtil.isBlank(deployKey)) {
+            // 生成 deployKey
+            deployKey = RandomUtil.randomString(6);
+        }
+
+        // 根据App的代码类别去获取部署的地址
+        String codeGenType = app.getCodeGenType();
+        String sourceDirName = codeGenType + "_" + appId;
+        String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
+
+
+        File sourceFile = new File(sourceDirPath);
+        if (!sourceFile.exists() || !sourceFile.isDirectory()) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "部署目录不存在");
+        }
+
+        // 复制文件到部署目录下面
+        String deployDirPath = AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + deployKey;
+        try {
+            FileUtil.copyContent(sourceFile, new File(deployDirPath), true);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "部署目录复制失败");
+        }
+
+        App updateApp = new App();
+        updateApp.setId(appId);
+        updateApp.setDeployKey(deployKey);
+        updateApp.setDeployedTime(LocalDateTime.now());
+        boolean result = updateById(updateApp);
+        if(!result){
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "应用部署失败");
+        }
+        log.info("应用部署成功，appId={}, deployKey={}", appId, deployKey);
+        return String.format("%s/%s", AppConstant.CODE_DEPLOY_HOST, deployKey);
+
     }
 
     /**

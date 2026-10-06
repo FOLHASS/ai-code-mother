@@ -8,7 +8,7 @@ import com.xy.aicodemother.common.ResultUtils;
 import com.xy.aicodemother.constant.UserConstant;
 import com.xy.aicodemother.exception.ErrorCode;
 import com.xy.aicodemother.exception.ThrowUtils;
-import com.xy.aicodemother.model.dto.*;
+import com.xy.aicodemother.model.dto.user.*;
 import com.xy.aicodemother.model.vo.LoginUserVO;
 import com.xy.aicodemother.model.vo.UserVO;
 import jakarta.annotation.Resource;

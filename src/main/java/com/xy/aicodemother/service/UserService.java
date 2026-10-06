@@ -1,14 +1,12 @@
 package com.xy.aicodemother.service;
 
-import cn.hutool.http.server.HttpServerRequest;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
-import com.xy.aicodemother.model.dto.UserQueryRequest;
+import com.xy.aicodemother.model.dto.user.UserQueryRequest;
 import com.xy.aicodemother.model.entity.User;
 import com.xy.aicodemother.model.vo.LoginUserVO;
 import com.xy.aicodemother.model.vo.UserVO;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.beans.BeanUtils;
 
 import java.util.List;
 

@@ -3,6 +3,7 @@ package com.xy.aicodemother.core.saver;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
+import com.xy.aicodemother.constant.AppConstant;
 import com.xy.aicodemother.exception.ErrorCode;
 import com.xy.aicodemother.exception.ThrowUtils;
 import com.xy.aicodemother.model.enums.CodeGenTypeEnum;
@@ -12,7 +13,7 @@ import java.nio.charset.StandardCharsets;
 
 public abstract class AbstractCodeSaveTemplate<T>{
     // 文件保存根目录
-    private static final String FILE_SAVE_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_output";
+    private static final String FILE_SAVE_ROOT_DIR = AppConstant.CODE_OUTPUT_ROOT_DIR;
 
     public final File saveCode(T result, long appId){
         // 1. 验证输入
@@ -52,7 +53,7 @@ public abstract class AbstractCodeSaveTemplate<T>{
      * 获取当前要生成的代码类型
      * @return
      */
-    protected abstract CodeGenTypeEnum getCodeType();
+    protected abstract String getCodeType();
 
     /**
      * 保存文件
