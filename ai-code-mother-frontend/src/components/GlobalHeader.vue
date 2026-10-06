@@ -111,7 +111,7 @@ const handleUserMenuClick = async ({ key }: { key: string | number }) => {
   align-items: center;
   gap: 24px;
   min-height: 68px;
-  max-width: 1280px;
+  width: min(1280px, 100%);
   margin: 0 auto;
 }
 

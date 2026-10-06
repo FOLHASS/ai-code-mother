@@ -489,6 +489,8 @@ onMounted(() => {
 
 <style scoped>
 .user-manage-page {
+  width: min(1280px, calc(100% - 48px));
+  margin: 0 auto;
   color: #1f2d3d;
 }
 

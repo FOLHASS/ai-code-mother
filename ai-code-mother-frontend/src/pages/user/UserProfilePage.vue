@@ -165,6 +165,8 @@ const handleSave = async () => {
 
 <style scoped>
 .profile-page {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
   color: #1f2d3d;
 }
 

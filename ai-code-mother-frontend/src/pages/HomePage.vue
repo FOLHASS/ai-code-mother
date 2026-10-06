@@ -259,7 +259,7 @@ watch(() => loginUserStore.loginUser.id, () => void loadMyApps())
 .prompt-examples { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 17px; }
 .prompt-examples button { padding: 9px 17px; color: #577284; font: inherit; font-size: 13px; background: rgb(255 255 255 / 88%); border: 1px solid rgb(255 255 255 / 70%); border-radius: 999px; cursor: pointer; }
 .prompt-examples button:hover { color: #168f80; border-color: #8bdccb; }
-.gallery-shell { width: 100%; margin: -32px auto 0; position: relative; z-index: 2; padding: 35px clamp(24px, 5vw, 72px) 68px; background: #fff; border-radius: 30px 30px 0 0; box-shadow: 0 -12px 45px rgb(53 125 169 / 10%); }
+.gallery-shell { width: min(1180px, calc(100% - 40px)); margin: -32px auto 0; position: relative; z-index: 2; padding: 35px 45px 68px; background: #fff; border-radius: 30px 30px 0 0; box-shadow: 0 -12px 45px rgb(53 125 169 / 10%); }
 .gallery-section + .gallery-section { margin-top: 66px; }
 .section-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 25px; }
 .section-kicker { margin: 0 0 8px; color: #2ca48e; font-size: 11px; font-weight: 750; letter-spacing: .16em; }

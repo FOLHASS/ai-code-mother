@@ -72,6 +72,10 @@ const handleMenuSelect = (key: string) => {
   padding: 42px 0 64px;
 }
 
+.content-container > :deep(*) {
+  width: 100%;
+}
+
 .workspace-container {
   width: 100%;
   padding: 0;
@@ -79,7 +83,6 @@ const handleMenuSelect = (key: string) => {
 
 @media (max-width: 768px) {
   .content-container {
-    width: min(100% - 32px, 1280px);
     padding: 28px 0 48px;
   }
 }
