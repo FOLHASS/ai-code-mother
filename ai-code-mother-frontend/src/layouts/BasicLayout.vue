@@ -67,9 +67,8 @@ const handleMenuSelect = (key: string) => {
 }
 
 .content-container {
-  width: min(1280px, calc(100% - 56px));
+  width: 100%;
   min-height: 320px;
-  margin: 0 auto;
   padding: 42px 0 64px;
 }
 

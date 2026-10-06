@@ -162,6 +162,10 @@ const handleUserMenuClick = async ({ key }: { key: string | number }) => {
 }
 
 .global-menu :deep(.ant-menu-item::after) {
+  border-bottom-color: transparent;
+}
+
+.global-menu :deep(.ant-menu-item-selected::after) {
   border-bottom-color: #2478d6;
 }
 
