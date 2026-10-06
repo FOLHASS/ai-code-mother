@@ -1,11 +1,14 @@
 package com.xy.aicodemother.core.parser;
-
 import com.xy.aicodemother.ai.model.MultiFileCodeResult;
 import com.xy.aicodemother.model.enums.CodeGenTypeEnum;
-
-import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MultiFileCodeParseStrategy extends CodeParseStrategy<MultiFileCodeResult>{
+    private static final Pattern HTML_CODE_PATTERN = Pattern.compile("```html\\s*\\n([\\s\\S]*?)```", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CSS_CODE_PATTERN = Pattern.compile("```css\\s*\\n([\\s\\S]*?)```", Pattern.CASE_INSENSITIVE);
+    private static final Pattern JS_CODE_PATTERN = Pattern.compile("```(?:js|javascript)\\s*\\n([\\s\\S]*?)```", Pattern.CASE_INSENSITIVE);
+
     @Override
     boolean support(CodeGenTypeEnum codeGenTypeEnum) {
         return codeGenTypeEnum.equals(CodeGenTypeEnum.MULTI_FILE);
@@ -16,111 +19,43 @@ public class MultiFileCodeParseStrategy extends CodeParseStrategy<MultiFileCodeR
         return parseMultiFileCode(content);
     }
 
-    /**
-     * 严格解析多文件输出。
-     *
-     * 固定顺序：
-     * 1. ### index.html + html 代码块
-     * 2. ### style.css + css 代码块
-     * 3. ### script.js + javascript 代码块
-     *
-     * 允许区块之间以及整个输出首尾存在空行。
-     * 文件标题与代码块开始标记之间不允许插入空行。
-     *
-     * @throws IllegalArgumentException 格式不符合要求
-     */
-    public MultiFileCodeResult parseMultiFileCode(
-            String codeContent) {
 
-        Cursor cursor = new Cursor(normalize(codeContent));
-
-        String htmlCode = cursor.readBlock("index.html", "html");
-        String cssCode = cursor.readBlock("style.css", "css");
-        String jsCode = cursor.readBlock("script.js", "javascript");
-
-        cursor.skipBlankLines();
-
-        if (cursor.hasNext()) {
-            throw cursor.error("script.js 区块后存在额外内容");
-        }
-
-        validateHtml(htmlCode);
-
+    public MultiFileCodeResult parseMultiFileCode(String codeContent) {
         MultiFileCodeResult result = new MultiFileCodeResult();
-        result.setHtmlCode(htmlCode);
-        result.setCssCode(cssCode);
-        result.setJsCode(jsCode);
+        // 提取各类代码
+        String htmlCode = extractCodeByPattern(codeContent, HTML_CODE_PATTERN);
+        String cssCode = extractCodeByPattern(codeContent, CSS_CODE_PATTERN);
+        String jsCode = extractCodeByPattern(codeContent, JS_CODE_PATTERN);
+        // 设置HTML代码
+        if (htmlCode != null && !htmlCode.trim().isEmpty()) {
+            result.setHtmlCode(htmlCode.trim());
+        }
+        // 设置CSS代码
+        if (cssCode != null && !cssCode.trim().isEmpty()) {
+            result.setCssCode(cssCode.trim());
+        }
+        // 设置JS代码
+        if (jsCode != null && !jsCode.trim().isEmpty()) {
+            result.setJsCode(jsCode.trim());
+        }
         return result;
     }
 
     /**
-     * 逐行解析，避免跨文件匹配或将代码中的反引号误判为结束标记。
+     * 根据正则模式提取代码
+     *
+     * @param content 原始内容
+     * @param pattern 正则模式
+     * @return 提取的代码
      */
-    private static final class Cursor {
-
-        private final List<String> lines;
-        private int position;
-
-        private Cursor(String content) {
-            this.lines = List.of(content.split("\n", -1));
+    private String extractCodeByPattern(String content, Pattern pattern) {
+        Matcher matcher = pattern.matcher(content);
+        if (matcher.find()) {
+            return matcher.group(1);
         }
-
-        private String readBlock(String filename, String language) {
-            skipBlankLines();
-
-            // 严格检查文件标题
-            expect("### " + filename);
-
-            // 必须紧接指定语言的代码块开始标记
-            expect("```" + language);
-
-            int start = position;
-
-            // 结束标记必须恰好为独占一行的三个反引号
-            while (hasNext() && !lines.get(position).equals("```")) {
-                position++;
-            }
-
-            if (!hasNext()) {
-                throw error(filename + " 缺少结束标记 ```");
-            }
-
-            // 保留代码内部的缩进、空格和空行
-            String code = String.join(
-                    "\n",
-                    lines.subList(start, position)
-            );
-
-            position++; // 跳过结束标记
-            return code;
-        }
-
-        private void expect(String expected) {
-            if (!hasNext()) {
-                throw error("输出不完整，缺少：" + expected);
-            }
-
-            if (!lines.get(position).equals(expected)) {
-                throw error("格式错误，此处必须为：" + expected);
-            }
-
-            position++;
-        }
-
-        private void skipBlankLines() {
-            while (hasNext() && lines.get(position).isBlank()) {
-                position++;
-            }
-        }
-
-        private boolean hasNext() {
-            return position < lines.size();
-        }
-
-        private IllegalArgumentException error(String message) {
-            return new IllegalArgumentException(
-                    message + "（第 " + (position + 1) + " 行）"
-            );
-        }
+        return null;
     }
 }
+
+
+

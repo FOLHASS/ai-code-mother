@@ -38,6 +38,31 @@ public abstract class CodeParseStrategy<T>{
     }
 
     /**
+     * Removes harmless Markdown presentation noise around generated code.
+     */
+    protected String stripMarkdownFence(String content, String language) {
+        String normalized = normalize(content).strip();
+        String openingFence = "```" + language;
+        if (normalized.regionMatches(true, 0, openingFence, 0, openingFence.length())) {
+            int openingEnd = openingFence.length();
+            while (openingEnd < normalized.length()
+                    && (normalized.charAt(openingEnd) == ' ' || normalized.charAt(openingEnd) == '\t')) {
+                openingEnd++;
+            }
+            if (openingEnd < normalized.length() && normalized.charAt(openingEnd) == '\n') {
+                int closingStart = normalized.lastIndexOf("```");
+                if (closingStart > openingEnd) {
+                    String trailing = normalized.substring(closingStart + 3).strip();
+                    if (trailing.isEmpty()) {
+                        return normalized.substring(openingEnd + 1, closingStart).strip();
+                    }
+                }
+            }
+        }
+        return normalized;
+    }
+
+    /**
      * 检查 HTML 首尾标记，不执行 HTML 语法验证。
      */
     protected void validateHtml(String htmlCode) {

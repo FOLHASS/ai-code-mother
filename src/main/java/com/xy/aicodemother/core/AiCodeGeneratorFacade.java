@@ -14,6 +14,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.io.File;
 
@@ -87,19 +88,20 @@ public class AiCodeGeneratorFacade {
     private Flux<String> processCodeStream(Flux<String> codeStream, CodeGenTypeEnum codeGenType, long appId) {
         StringBuilder codeBuilder = new StringBuilder();
         // 实时收集代码片段
-        return codeStream.doOnNext(codeBuilder::append).doOnComplete(() -> {
-            // 流式返回完成后保存代码
-            try {
-                String completeCode = codeBuilder.toString();
-                // 使用执行器解析代码
-                Object parsedResult = CodeParseStrategyContext.parser(completeCode, codeGenType);
-                // 使用执行器保存代码
-                File savedDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
-                log.info("保存成功，路径为：" + savedDir.getAbsolutePath());
-            } catch (Exception e) {
-                log.error("保存失败: {}", e.getMessage());
-            }
-        });
+        return codeStream
+                .doOnNext(codeBuilder::append)
+                .concatWith(Mono.defer(() -> {
+                    try {
+                        String completeCode = codeBuilder.toString();
+                        Object parsedResult = CodeParseStrategyContext.parser(completeCode, codeGenType);
+                        File savedDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
+                        log.info("保存成功，路径为：{}", savedDir.getAbsolutePath());
+                        return Mono.empty();
+                    } catch (Exception e) {
+                        log.error("保存失败: {}", e.getMessage(), e);
+                        return Mono.error(e);
+                    }
+                }));
     }
 
 }

@@ -15,14 +15,34 @@ const router = createRouter({
           component: () => import('@/pages/HomePage.vue'),
         },
         {
+          path: 'app/:id',
+          name: 'AppChatPage',
+          component: () => import('@/pages/AppChatPage.vue'),
+          meta: { requiresAuth: true },
+        },
+        {
+          path: 'app/edit/:id',
+          name: 'AppEditPage',
+          component: () => import('@/pages/AppEditPage.vue'),
+          meta: { requiresAuth: true },
+        },
+        {
+          path: 'admin/appManage',
+          name: 'AdminAppManagePage',
+          component: () => import('@/pages/admin/AppManagePage.vue'),
+          meta: { requiresAdmin: true },
+        },
+        {
           path: 'admin/userManage',
           name: 'AdminUserManagePage',
           component: () => import('@/pages/admin/UserManagePage.vue'),
+          meta: { requiresAdmin: true },
         },
         {
           path: 'user/profile',
           name: 'UserProfilePage',
           component: () => import('@/pages/user/UserProfilePage.vue'),
+          meta: { requiresAuth: true },
         },
       ],
     },
@@ -49,11 +69,14 @@ router.beforeEach(async (to) => {
   const loginUserStore = useLoginUserStore()
   await loginUserStore.fetchLoginUser()
 
-  if (to.name !== 'AdminUserManagePage') {
-    return true
+  if (to.meta.requiresAuth && !loginUserStore.loginUser.id) {
+    return {
+      name: 'loginPage',
+      query: { redirect: to.fullPath },
+    }
   }
 
-  if (loginUserStore.loginUser.userRole !== 'admin') {
+  if (to.meta.requiresAdmin && loginUserStore.loginUser.userRole !== 'admin') {
     return {
       path: '/',
       query: { forbidden: 'admin' },

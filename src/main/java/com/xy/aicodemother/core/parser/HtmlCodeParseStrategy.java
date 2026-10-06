@@ -7,15 +7,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class HtmlCodeParseStrategy extends CodeParseStrategy<HtmlCodeResult>{
-
-    /**
-     * 单文件解析使用：
-     * 结束标记必须独占一行，避免误截断代码中的反引号。
-     */
-    private static final Pattern HTML_CODE_PATTERN = Pattern.compile(
-            "^```html[\\t ]*\\n([\\s\\S]*?)^```[\\t ]*$",
-            Pattern.MULTILINE | Pattern.CASE_INSENSITIVE
-    );
+    private static final Pattern HTML_CODE_PATTERN = Pattern.compile("```html\\s*\\n([\\s\\S]*?)```", Pattern.CASE_INSENSITIVE);
 
     @Override
     public boolean support(CodeGenTypeEnum codeGenTypeEnum) {
@@ -28,23 +20,31 @@ public class HtmlCodeParseStrategy extends CodeParseStrategy<HtmlCodeResult>{
         return parseHtmlCode(content);
     }
 
-
-    /**
-     * 解析 HTML 单文件代码。
-     * 支持 Markdown HTML 代码块，以及直接返回的 HTML。
-     */
-    private HtmlCodeResult parseHtmlCode(String codeContent) {
-        String content = normalize(codeContent);
-
-        Matcher matcher = HTML_CODE_PATTERN.matcher(content);
-        String htmlCode = matcher.find()
-                ? matcher.group(1).strip()
-                : content.strip();
-
-        validateHtml(htmlCode);
-
+    public HtmlCodeResult parseHtmlCode(String codeContent) {
         HtmlCodeResult result = new HtmlCodeResult();
-        result.setHtmlCode(htmlCode);
+        // 提取 HTML 代码
+        String htmlCode = extractHtmlCode(codeContent);
+        if (htmlCode != null && !htmlCode.trim().isEmpty()) {
+            result.setHtmlCode(htmlCode.trim());
+        } else {
+            // 如果没有找到代码块，将整个内容作为HTML
+            result.setHtmlCode(codeContent.trim());
+        }
         return result;
     }
+
+    /**
+     * 提取HTML代码内容
+     *
+     * @param content 原始内容
+     * @return HTML代码
+     */
+    private String extractHtmlCode(String content) {
+        Matcher matcher = HTML_CODE_PATTERN.matcher(content);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return null;
+    }
 }
+

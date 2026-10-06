@@ -75,12 +75,19 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                     return ServerSentEvent.<String>builder()
                             .data(jsonStr)
                             .build();
-                }).concatWith(Mono.just(
-                        ServerSentEvent.<String>builder()
-                                .event("done")
-                                .data("")
-                                .build()
-                ));
+                })
+                .concatWith(Mono.just(ServerSentEvent.<String>builder()
+                        .event("done")
+                        .data("")
+                        .build()))
+                .onErrorResume(error -> {
+                    log.error("代码生成流失败，appId={}", appId, error);
+                    String errorMessage = StrUtil.blankToDefault(error.getMessage(), "代码生成失败，请稍后重试");
+                    return Mono.just(ServerSentEvent.<String>builder()
+                            .event("error")
+                            .data(JSONUtil.toJsonStr(Map.of("message", errorMessage)))
+                            .build());
+                });
     }
 
     /**
