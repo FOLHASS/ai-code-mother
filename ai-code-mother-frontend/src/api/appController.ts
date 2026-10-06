@@ -91,29 +91,31 @@ export async function* streamChatToGenCode(params: API.chatToGenCodeParams) {
     }
   }
 
-  // 一个网络 chunk 可能包含多个 SSE 事件，也可能只包含半个事件。
-  // 必须按 SSE 的空行分隔符逐个解析，解析到一个事件就立即 yield。
+  // 按 SSE 标准逐行消费，避免依赖网络 chunk 的边界。
   while (true) {
     const { done, value } = await reader.read()
+    console.debug('[SSE read]', { done, bytes: value?.byteLength ?? 0, at: new Date().toISOString() })
     buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
 
-    const events = buffer.split(/\r?\n\r?\n/)
-    buffer = events.pop() || ''
-    for (const event of events) {
-      const parsed = parseEvent(event)
-      if (parsed?.type === 'error') {
-        throw new Error(parsed.content)
-      }
-      if (parsed?.type === 'done') {
-        return
-      }
-      if (parsed?.type === 'chunk') {
-        yield parsed.content
+    const lines = buffer.split(/\r\n|\n|\r/)
+    buffer = lines.pop() || ''
+    let eventLines: string[] = []
+    for (const line of lines) {
+      if (line === '') {
+        const parsed = parseEvent(eventLines.join('\n'))
+        eventLines = []
+        console.debug('[SSE event]', { parsed, at: new Date().toISOString() })
+        if (parsed?.type === 'error') throw new Error(parsed.content)
+        if (parsed?.type === 'done') return
+        if (parsed?.type === 'chunk') yield parsed.content
+      } else if (!line.startsWith(':')) {
+        eventLines.push(line)
       }
     }
 
     if (done) {
-      const parsed = parseEvent(buffer)
+      if (buffer) eventLines.push(buffer)
+      const parsed = parseEvent(eventLines.join('\n'))
       if (parsed?.type === 'error') {
         throw new Error(parsed.content)
       }

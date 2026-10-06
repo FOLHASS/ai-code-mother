@@ -73,6 +73,10 @@ const scrollToBottom = async () => {
 const appendStreamChunk = (assistantMessage: ChatMessage, chunk: string) => {
   if (!chunk) return
   assistantMessage.content += chunk
+  const index = messages.value.findIndex((item) => item.id === assistantMessage.id)
+  if (index >= 0) {
+    messages.value[index] = { ...assistantMessage }
+  }
   void scrollToBottom()
 }
 
@@ -225,7 +229,7 @@ onUpdated(() => void scrollToBottom())
           <div v-if="!messages.length" class="conversation-empty"><span class="empty-orbit"><i></i></span><strong>{{ isLoadingApp ? '正在连接应用' : '从一句话开始' }}</strong><p>{{ isLoadingApp ? '马上开始生成对话' : '告诉 AI 你想怎样调整这个应用' }}</p></div>
           <article v-for="item in messages" :key="item.id" class="message-row" :class="`message-${item.role}`">
             <img v-if="item.role === 'assistant'" :src="logoUrl" alt="AI" class="message-avatar" />
-            <div class="message-body"><div class="message-meta">{{ item.role === 'user' ? '你' : 'AI 助手' }}</div><div class="message-bubble" :class="{ 'message-error': item.error }"><span v-if="!item.content && item.loading" class="typing-dots"><i></i><i></i><i></i></span><div v-else-if="item.role === 'assistant'" class="markdown-content" v-html="renderAssistantMessage(item.content)" @click="copyCode"></div><pre v-else>{{ item.content }}</pre><span v-if="item.loading && item.content" class="streaming-cursor"></span></div></div>
+            <div class="message-body"><div class="message-meta">{{ item.role === 'user' ? '你' : 'AI 助手' }}</div><div class="message-bubble" :class="{ 'message-error': item.error }"><span v-if="!item.content && item.loading" class="typing-dots"><i></i><i></i><i></i></span><div v-else-if="item.role === 'assistant'" class="markdown-content" v-html="renderAssistantMessage(item.content)" @click="copyCode"></div><pre v-else>{{ item.content }}</pre><span v-if="item.role === 'assistant' && item.loading && item.content" class="streaming-cursor"></span></div></div>
           </article>
         </div>
         <form class="chat-composer" @submit.prevent="sendMessage()">

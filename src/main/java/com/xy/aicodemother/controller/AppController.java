@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 应用控制层。
@@ -57,6 +58,7 @@ public class AppController {
                                     HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
         SseEmitter emitter = new SseEmitter(0L);
+        AtomicInteger eventIndex = new AtomicInteger();
         emitter.onTimeout(emitter::complete);
         emitter.onError(error -> emitter.completeWithError(error));
         appService.chatToGenCode(appId, message, loginUser)
@@ -68,6 +70,9 @@ public class AppController {
                             emitter.send(SseEmitter.event().name("error").data(event.data()));
                             emitter.complete();
                         } else {
+                            int index = eventIndex.incrementAndGet();
+                            System.out.println("SSE send #" + index + ", data length="
+                                    + String.valueOf(event.data()).length());
                             emitter.send(SseEmitter.event().data(event.data()));
                         }
                     } catch (Exception sendError) {

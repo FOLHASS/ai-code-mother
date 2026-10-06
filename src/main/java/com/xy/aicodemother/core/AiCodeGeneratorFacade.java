@@ -87,9 +87,14 @@ public class AiCodeGeneratorFacade {
      */
     private Flux<String> processCodeStream(Flux<String> codeStream, CodeGenTypeEnum codeGenType, long appId) {
         StringBuilder codeBuilder = new StringBuilder();
+        java.util.concurrent.atomic.AtomicInteger chunkIndex = new java.util.concurrent.atomic.AtomicInteger();
         // 实时收集代码片段
         return codeStream
-                .doOnNext(codeBuilder::append)
+                .doOnNext(chunk -> {
+                    int index = chunkIndex.incrementAndGet();
+                    log.info("AI stream chunk #{}: length={}, appId={}", index, chunk.length(), appId);
+                    codeBuilder.append(chunk);
+                })
                 .concatWith(Mono.defer(() -> {
                     try {
                         String completeCode = codeBuilder.toString();

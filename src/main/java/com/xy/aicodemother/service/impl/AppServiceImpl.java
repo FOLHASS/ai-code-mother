@@ -70,6 +70,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 使用非流式生成入口；该调用会等待 AI 返回、代码解析和文件保存全部完成。
         return aiCodeGeneratorFacade.generateAndSaveCodeStream(userMessage, codeGenType, appId)
                 .map(chunk -> {
+                    log.info("SSE payload: length={}, appId={}", chunk.length(), appId);
                     Map<String, String> wrapper = Map.of("d", chunk);
                     String jsonStr = JSONUtil.toJsonStr(wrapper);
                     return ServerSentEvent.<String>builder()
