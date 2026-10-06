@@ -9,7 +9,11 @@ import {
   getUserVoList,
   updateUser,
 } from '@/api/userController.ts'
+import PageHeader from '@/components/PageHeader.vue'
+import PageStat from '@/components/PageStat.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { useLoginUserStore } from '@/stores/loginUserStore.ts'
+import { formatDateTime } from '@/utils/app.ts'
 
 type UserRole = 'user' | 'admin' | 'ban'
 type UserTableColumnKey =
@@ -86,9 +90,7 @@ const formatRole = (role?: string) => {
 }
 
 const formatDate = (date?: string) => {
-  if (!date) return '-'
-  const parsedDate = new Date(date)
-  return Number.isNaN(parsedDate.getTime()) ? date : parsedDate.toLocaleString('zh-CN')
+  return formatDateTime(date)
 }
 
 const loadUsers = async () => {
@@ -277,23 +279,17 @@ onMounted(() => {
 
 <template>
   <section v-if="isAdmin" class="user-manage-page">
-    <header class="page-header">
-      <div>
-        <p class="page-eyebrow">ADMIN CONSOLE</p>
-        <h1>用户管理</h1>
-        <p>集中查看和维护平台用户信息。</p>
-      </div>
-      <div class="header-actions">
-        <div class="header-stat">
-          <strong>{{ totalUsers }}</strong>
-          <span>用户总数</span>
-        </div>
+    <PageHeader eyebrow="ADMIN CONSOLE" title="用户管理" description="集中查看和维护平台用户信息。">
+      <template #actions>
+        <div class="header-actions">
+          <PageStat :value="totalUsers" label="用户总数" />
         <button class="primary-button create-button" type="button" @click="openCreateModal">
           <span aria-hidden="true">＋</span>
           创建用户
         </button>
-      </div>
-    </header>
+        </div>
+      </template>
+    </PageHeader>
 
     <section class="query-panel" aria-label="用户查询条件">
       <div class="query-grid">
@@ -369,12 +365,7 @@ onMounted(() => {
                 <template v-if="column.key === 'id'"> #{{ user.id }} </template>
 
                 <div v-else-if="column.key === 'user'" class="user-cell">
-                  <img
-                    v-if="user.userAvatar"
-                    :src="user.userAvatar"
-                    :alt="user.userName || '用户头像'"
-                  />
-                  <span v-else class="avatar-fallback">{{ (user.userName || '用').slice(0, 1) }}</span>
+                  <UserAvatar :avatar="user.userAvatar" :name="user.userName || user.userAccount" size="sm" />
                   <strong>{{ user.userName || '未设置昵称' }}</strong>
                 </div>
 
@@ -494,24 +485,11 @@ onMounted(() => {
   color: #1f2d3d;
 }
 
-.page-header,
 .table-toolbar {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-}
-
-.page-header {
-  margin-bottom: 24px;
-}
-
-.page-eyebrow {
-  margin: 0 0 8px;
-  color: #3478d4;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
 }
 
 h1,
@@ -524,17 +502,6 @@ h1 {
   margin-bottom: 8px;
   color: #152b46;
   font-size: 30px;
-}
-
-.page-header p:last-child {
-  margin-bottom: 0;
-  color: #728196;
-}
-
-.header-stat {
-  min-width: 110px;
-  padding-left: 20px;
-  border-left: 1px solid #dce7f2;
 }
 
 .header-actions {
@@ -553,23 +520,6 @@ h1 {
 .create-button span {
   font-size: 18px;
   line-height: 1;
-}
-
-.header-stat strong,
-.header-stat span {
-  display: block;
-}
-
-.header-stat strong {
-  color: #2679d9;
-  font-size: 28px;
-  line-height: 1.1;
-}
-
-.header-stat span {
-  margin-top: 5px;
-  color: #8291a4;
-  font-size: 12px;
 }
 
 .query-panel,
@@ -756,26 +706,6 @@ td {
   min-width: 130px;
 }
 
-.user-cell img,
-.avatar-fallback {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-}
-
-.user-cell img {
-  object-fit: cover;
-}
-
-.avatar-fallback {
-  display: grid;
-  place-items: center;
-  color: #2679d9;
-  background: #e8f2ff;
-  font-size: 13px;
-  font-weight: 700;
-}
-
 .user-cell strong {
   color: #2b3e55;
   font-weight: 600;
@@ -893,19 +823,10 @@ td {
 }
 
 @media (max-width: 700px) {
-  .page-header {
-    align-items: flex-start;
-  }
-
   .header-actions {
     align-items: flex-end;
     flex-direction: column-reverse;
     gap: 12px;
-  }
-
-  .header-stat {
-    min-width: 76px;
-    padding-left: 12px;
   }
 
   .query-grid {

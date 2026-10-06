@@ -94,7 +94,6 @@ export async function* streamChatToGenCode(params: API.chatToGenCodeParams) {
   // 按 SSE 标准逐行消费，避免依赖网络 chunk 的边界。
   while (true) {
     const { done, value } = await reader.read()
-    console.debug('[SSE read]', { done, bytes: value?.byteLength ?? 0, at: new Date().toISOString() })
     buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
 
     const lines = buffer.split(/\r\n|\n|\r/)
@@ -104,7 +103,6 @@ export async function* streamChatToGenCode(params: API.chatToGenCodeParams) {
       if (line === '') {
         const parsed = parseEvent(eventLines.join('\n'))
         eventLines = []
-        console.debug('[SSE event]', { parsed, at: new Date().toISOString() })
         if (parsed?.type === 'error') throw new Error(parsed.content)
         if (parsed?.type === 'done') return
         if (parsed?.type === 'chunk') yield parsed.content

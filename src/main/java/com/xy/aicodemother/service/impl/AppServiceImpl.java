@@ -203,7 +203,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Override
     public AppVO getAppVOById(Long appId, User loginUser) {
-        return getAppVO(getOwnedApp(appId, loginUser));
+        // 登录用户可以只读查看其他作品；生成、部署、修改和删除仍校验归属。
+        getLoginUserId(loginUser);
+        return getAppVO(getExistingApp(appId));
     }
 
     @Override
@@ -226,7 +228,14 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Override
     public boolean adminDeleteApp(Long appId) {
-        getExistingApp(appId);
+        App existingApp = getExistingApp(appId);
+        // 删除了应用 同时也应该删除本地生成的文件
+        boolean isDeleteCodeOutput = FileUtil.del(AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + existingApp.getCodeGenType() + "_" + existingApp.getId());
+        ThrowUtils.throwIf(!isDeleteCodeOutput, ErrorCode.SYSTEM_ERROR, "应用文件删除失败");
+        // 如果已经部署，也应该删除部署的文件
+        boolean isDeleteCodeDeploy = FileUtil.del(AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + existingApp.getDeployKey());
+        ThrowUtils.throwIf(!isDeleteCodeDeploy, ErrorCode.SYSTEM_ERROR, "应用部署文件删除失败");
+        // 从数据库删除该应用
         boolean result = this.removeById(appId);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "应用删除失败");
         return true;
@@ -283,7 +292,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     }
 
     /**
-     * 普通用户的查看、修改和删除统一校验应用归属。
+     * 生成、部署、修改和删除统一校验应用归属。
      */
     private App getOwnedApp(Long appId, User loginUser) {
         Long userId = getLoginUserId(loginUser);

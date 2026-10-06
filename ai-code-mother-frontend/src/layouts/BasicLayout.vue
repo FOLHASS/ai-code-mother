@@ -4,7 +4,6 @@ import { Layout } from 'ant-design-vue'
 import type { MenuProps } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import GlobalFooter from '@/components/GlobalFooter.vue'
 import GlobalHeader from '@/components/GlobalHeader.vue'
 import { useLoginUserStore } from '@/stores/loginUserStore.ts'
 
@@ -39,7 +38,6 @@ const handleMenuSelect = (key: string) => {
       </main>
     </Layout.Content>
 
-    <GlobalFooter v-if="showGlobalChrome" />
   </Layout>
 </template>
 

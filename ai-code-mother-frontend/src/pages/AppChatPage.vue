@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, onUpdated, ref } from 'vue'
-import { message } from 'ant-design-vue'
+import { computed, nextTick, onMounted, onUpdated, ref } from 'vue'
+import { message, Tooltip } from 'ant-design-vue'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js/lib/common'
 import MarkdownIt from 'markdown-it'
@@ -9,7 +9,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { adminGetAppVoById, deploy, getAppVoById, streamChatToGenCode } from '@/api/appController.ts'
 import logoUrl from '@/assets/logo.png'
 import { useLoginUserStore } from '@/stores/loginUserStore.ts'
-import { getPreviewUrl } from '@/utils/app.ts'
+import { getDeployUrl, getPreviewUrl } from '@/utils/app.ts'
 
 type ChatMessage = {
   id: number
@@ -61,9 +61,13 @@ const markdown = new MarkdownIt({
 const appId = computed(() => String(route.params.id || ''))
 const appTitle = computed(() => app.value?.appName || '未命名应用')
 const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser.id))
-const isOwner = computed(() => Boolean(app.value?.userId && app.value.userId === loginUserStore.loginUser.id))
+const isOwner = computed(() => Boolean(
+  isLoggedIn.value && app.value?.userId &&
+  String(app.value.userId) === String(loginUserStore.loginUser.id),
+))
 const canInteract = computed(() => isOwner.value)
-const generationStorageKey = computed(() => `app-generated:${appId.value}`)
+// 查看入口只展示已有作品；该参数不影响创建者主动继续对话。
+const isViewMode = computed(() => Object.hasOwn(route.query, 'view'))
 
 const scrollToBottom = async () => {
   await nextTick()
@@ -115,19 +119,18 @@ const loadApp = async () => {
       return
     }
     app.value = response.data.data
-    hasSentInitialPrompt.value = localStorage.getItem(generationStorageKey.value) === '1'
-    hasGeneratedWebsite.value = hasSentInitialPrompt.value && Boolean(app.value.codeGenType)
-    if (hasGeneratedWebsite.value && app.value.codeGenType) {
+    deployedUrl.value = getDeployUrl(app.value)
+    if (isViewMode.value && app.value.codeGenType) {
+      hasGeneratedWebsite.value = true
       previewUrl.value = getPreviewUrl(app.value)
     }
 
     const initialPrompt = typeof route.query.prompt === 'string' ? route.query.prompt.trim() : ''
-    if (!hasSentInitialPrompt.value && canInteract.value && (initialPrompt || app.value.initPrompt?.trim())) {
+    if (!isViewMode.value && !hasSentInitialPrompt.value && canInteract.value && (initialPrompt || app.value.initPrompt?.trim())) {
       hasSentInitialPrompt.value = true
+      // 消费一次初始生成入口，刷新或后续返回详情时不再自动重发。
+      await router.replace({ path: route.path, query: { ...route.query, prompt: undefined, view: '1' } })
       await sendMessage(initialPrompt || app.value.initPrompt || '', true)
-      if (route.query.prompt) {
-        await router.replace({ path: route.path, query: {} })
-      }
     }
   } catch {
     message.error('应用加载失败，请稍后重试')
@@ -153,7 +156,6 @@ const sendMessage = async (value = input.value, isInitial = false) => {
       appendStreamChunk(assistantMessage, chunk)
     }
     assistantMessage.loading = false
-    localStorage.setItem(generationStorageKey.value, '1')
     hasGeneratedWebsite.value = true
     previewUrl.value = getPreviewUrl(app.value, true)
   } catch (error) {
@@ -201,8 +203,6 @@ onMounted(async () => {
   await loadApp()
 })
 
-onUnmounted(() => undefined)
-
 onUpdated(() => void scrollToBottom())
 </script>
 
@@ -226,20 +226,22 @@ onUpdated(() => void scrollToBottom())
       <section class="conversation-panel">
         <div class="conversation-heading"><div><p>CONVERSATION</p><h1>和 AI 一起完善应用</h1></div><span class="online-indicator"><i></i> {{ isLoadingApp ? '连接中' : isStreaming ? '生成中' : 'AI 在线' }}</span></div>
         <div ref="messageList" class="message-list">
-          <div v-if="!messages.length" class="conversation-empty"><span class="empty-orbit"><i></i></span><strong>{{ isLoadingApp ? '正在连接应用' : '从一句话开始' }}</strong><p>{{ isLoadingApp ? '马上开始生成对话' : '告诉 AI 你想怎样调整这个应用' }}</p></div>
+          <div v-if="!messages.length" class="conversation-empty"><span class="empty-orbit"><i></i></span><strong>{{ isLoadingApp ? '正在连接应用' : canInteract ? '继续完善你的作品' : '作品查看模式' }}</strong><p>{{ isLoadingApp ? '正在读取应用信息' : canInteract ? '发送消息，告诉 AI 你想怎样调整这个应用' : '你可以预览作品，仅创建者可以继续对话' }}</p></div>
           <article v-for="item in messages" :key="item.id" class="message-row" :class="`message-${item.role}`">
             <img v-if="item.role === 'assistant'" :src="logoUrl" alt="AI" class="message-avatar" />
             <div class="message-body"><div class="message-meta">{{ item.role === 'user' ? '你' : 'AI 助手' }}</div><div class="message-bubble" :class="{ 'message-error': item.error }"><span v-if="!item.content && item.loading" class="typing-dots"><i></i><i></i><i></i></span><div v-else-if="item.role === 'assistant'" class="markdown-content" v-html="renderAssistantMessage(item.content)" @click="copyCode"></div><pre v-else>{{ item.content }}</pre><span v-if="item.role === 'assistant' && item.loading && item.content" class="streaming-cursor"></span></div></div>
           </article>
         </div>
-        <form class="chat-composer" @submit.prevent="sendMessage()">
+        <Tooltip :title="!isLoadingApp && !canInteract ? '无法在别人的作品下对话哦~' : undefined" placement="top">
+        <form class="chat-composer" :class="{ 'chat-composer--readonly': !canInteract }" @submit.prevent="sendMessage()">
           <textarea v-model="input" :disabled="isLoadingApp || isStreaming || !isLoggedIn || !canInteract" rows="3" :placeholder="canInteract ? '描述更详细，页面会更具体。按 Enter 发送，Shift + Enter 换行' : '当前为只读预览，仅应用创建者可以继续对话'" @keydown="handleKeydown"></textarea>
-          <div class="composer-footer"><span>{{ isStreaming ? 'AI 正在生成，请稍候...' : canInteract ? '支持连续对话迭代' : '管理员查看模式' }}</span><button type="submit" :disabled="isStreaming || !input.trim() || !canInteract"><span aria-hidden="true">↑</span></button></div>
+          <div class="composer-footer"><span>{{ isStreaming ? 'AI 正在生成，请稍候...' : canInteract ? '支持连续对话迭代' : '只读查看' }}</span><button type="submit" :disabled="isLoadingApp || isStreaming || !input.trim() || !canInteract"><span aria-hidden="true">↑</span></button></div>
         </form>
+        </Tooltip>
       </section>
 
       <section class="preview-panel">
-        <div class="preview-heading"><div><p>LIVE PREVIEW</p><h2>生成后的网站展示</h2></div><span v-if="hasGeneratedWebsite" class="preview-status"><i></i> 已生成</span></div>
+        <div class="preview-heading"><div><p>LIVE PREVIEW</p><h2>生成后的网站展示</h2></div><span v-if="hasGeneratedWebsite" class="preview-status"><i></i> 网站预览</span></div>
         <div class="browser-frame">
           <div class="browser-toolbar"><span class="browser-dots"><i></i><i></i><i></i></span><div class="browser-address">localhost / {{ app?.codeGenType || 'preview' }}</div><span class="browser-refresh">↻</span></div>
           <div class="browser-content">
@@ -306,6 +308,8 @@ onUpdated(() => void scrollToBottom())
 .chat-composer { margin: 0 18px 18px; padding: 12px 13px 10px; background: #fbfdfd; border: 1px solid #dfeaec; border-radius: 12px; }
 .chat-composer textarea { display: block; width: 100%; padding: 0; color: #304d5b; font: inherit; font-size: 13px; line-height: 1.55; background: transparent; border: 0; outline: 0; resize: none; }
 .chat-composer textarea::placeholder { color: #a6b2b8; }
+.chat-composer--readonly { cursor: not-allowed; }
+.chat-composer--readonly textarea { pointer-events: none; }
 .composer-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; color: #9aabb2; font-size: 10px; }
 .composer-footer button { display: grid; width: 32px; height: 32px; color: #fff; font-size: 20px; place-items: center; background: #819196; border: 0; border-radius: 50%; cursor: pointer; }
 .composer-footer button:disabled { cursor: not-allowed; opacity: .45; }

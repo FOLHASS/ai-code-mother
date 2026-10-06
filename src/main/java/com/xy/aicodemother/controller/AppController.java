@@ -127,7 +127,7 @@ public class AppController {
     }
 
     /**
-     * 用户查看自己创建的应用详情。
+     * 登录用户只读查看应用详情。
      */
     @GetMapping("/get/vo")
     public BaseResponse<AppVO> getAppVOById(@RequestParam("id") Long id,

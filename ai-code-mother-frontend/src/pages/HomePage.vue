@@ -4,8 +4,9 @@ import { message, Modal } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 
 import { addApp, deleteApp, listGoodAppVoByPage, listMyAppVoByPage } from '@/api/appController.ts'
+import AppCard from '@/components/AppCard.vue'
+import AppEditModal from '@/components/AppEditModal.vue'
 import { useLoginUserStore } from '@/stores/loginUserStore.ts'
-import { formatDate, getAppCover, getInitial, getPreviewUrl } from '@/utils/app.ts'
 
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
@@ -21,6 +22,8 @@ const myPage = ref(1)
 const goodPage = ref(1)
 const pageSize = 6
 const goodSearch = ref('')
+const editingApp = ref<API.AppVO | null>(null)
+const showEditModal = ref(false)
 
 const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser.id))
 const displayName = computed(
@@ -101,16 +104,27 @@ const submitPrompt = async () => {
 }
 
 const openApp = (app: API.AppVO) => {
-  if (app.priority === 99 && app.userId !== loginUserStore.loginUser.id) {
-    const previewUrl = getPreviewUrl(app)
-    if (previewUrl) window.open(previewUrl, '_blank', 'noopener,noreferrer')
-    return
-  }
-  if (app.id) void router.push(`/app/${app.id}`)
+  if (app.id) void router.push({ path: `/app/${app.id}`, query: { view: '1' } })
 }
 
 const editApp = (app: API.AppVO) => {
-  if (app.id) void router.push(`/app/edit/${app.id}`)
+  if (!app.id) return
+  if (!isLoggedIn.value || String(app.userId) !== String(loginUserStore.loginUser.id)) {
+    message.warning('只能编辑自己的作品')
+    return
+  }
+  editingApp.value = app
+  showEditModal.value = true
+}
+
+const handleAppSaved = (updatedApp: API.AppVO) => {
+  const updateName = (app: API.AppVO) => app.id === updatedApp.id
+    ? { ...app, appName: updatedApp.appName }
+    : app
+  myApps.value = myApps.value.map(updateName)
+  goodApps.value = goodApps.value.map(updateName)
+  // 有名称筛选时重新查询，保证精选列表仍符合当前搜索条件。
+  if (goodSearch.value.trim()) void loadGoodApps()
 }
 
 const removeApp = (app: API.AppVO) => {
@@ -197,15 +211,14 @@ watch(() => loginUserStore.loginUser.id, () => void loadMyApps())
         </div>
         <div v-else-if="isMyLoading" class="card-grid loading-grid"><div v-for="n in 3" :key="n" class="skeleton-card"></div></div>
         <div v-else-if="myApps.length" class="card-grid">
-          <article v-for="app in myApps" :key="app.id" class="app-card" @click="openApp(app)">
-            <div class="app-thumbnail">
-              <img v-if="getAppCover(app)" :src="getAppCover(app)" :alt="app.appName || '应用封面'" />
-              <div v-else class="thumbnail-placeholder"><span>{{ getInitial(app.appName) }}</span><i>✦</i></div>
-              <div class="card-hover">打开应用 <span>→</span></div>
-            </div>
-            <div class="card-info"><div><h3>{{ app.appName || '未命名应用' }}</h3><p>创建于 {{ formatDate(app.createTime) }}</p></div><button class="more-button" type="button" aria-label="应用操作" @click.stop="editApp(app)">···</button></div>
-            <div class="card-actions"><button type="button" @click.stop="editApp(app)">编辑</button><button type="button" @click.stop="removeApp(app)">删除</button></div>
-          </article>
+          <AppCard
+            v-for="app in myApps"
+            :key="app.id"
+            :app="app"
+            @open="openApp"
+            @edit="editApp"
+            @remove="removeApp"
+          />
         </div>
         <div v-else class="plain-empty">还没有应用，从上面的输入框开始创建吧。</div>
         <div v-if="isLoggedIn && myTotal > pageSize" class="pagination-bar">
@@ -220,10 +233,14 @@ watch(() => loginUserStore.loginUser.id, () => void loadMyApps())
         </div>
         <div v-if="isGoodLoading" class="card-grid loading-grid"><div v-for="n in 3" :key="n" class="skeleton-card"></div></div>
         <div v-else-if="goodApps.length" class="card-grid">
-          <article v-for="app in goodApps" :key="app.id" class="app-card featured-card" @click="openApp(app)">
-            <div class="app-thumbnail"><img v-if="getAppCover(app)" :src="getAppCover(app)" :alt="app.appName || '应用封面'" /><div v-else class="thumbnail-placeholder featured-placeholder"><span>{{ getInitial(app.appName) }}</span><i>✦</i></div><div class="featured-badge">精选</div><div class="card-hover">查看案例 <span>→</span></div></div>
-            <div class="card-info"><div><h3>{{ app.appName || '未命名应用' }}</h3><p>{{ app.user?.userName || 'NoCode 创作者' }} · {{ formatDate(app.createTime) }}</p></div></div>
-          </article>
+          <AppCard
+            v-for="app in goodApps"
+            :key="app.id"
+            :app="app"
+            variant="featured"
+            :show-actions="false"
+            @open="openApp"
+          />
         </div>
         <div v-else class="plain-empty">暂时没有匹配的精选应用。</div>
         <div v-if="goodTotal > pageSize" class="pagination-bar">
@@ -231,6 +248,7 @@ watch(() => loginUserStore.loginUser.id, () => void loadMyApps())
         </div>
       </section>
     </section>
+    <AppEditModal v-model:open="showEditModal" :app="editingApp" @saved="handleAppSaved" />
   </main>
 </template>
 
@@ -266,27 +284,6 @@ watch(() => loginUserStore.loginUser.id, () => void loadMyApps())
 .section-header h2 { margin: 0 0 7px; color: #152b42; font-size: 28px; letter-spacing: -.02em; }
 .section-header p:last-child { margin: 0; color: #94a0ad; font-size: 13px; }
 .card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
-.app-card { position: relative; min-width: 0; cursor: pointer; }
-.app-thumbnail { position: relative; height: 195px; overflow: hidden; background: #f1f6fa; border: 1px solid #edf1f3; border-radius: 14px; }
-.app-thumbnail img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s; }
-.app-card:hover .app-thumbnail img { transform: scale(1.04); }
-.thumbnail-placeholder { display: grid; height: 100%; overflow: hidden; color: #193b4b; place-items: center; background: radial-gradient(circle at 30% 30%, #c5f4e7, transparent 30%), linear-gradient(135deg, #eefaf9, #b9dcf4); }
-.thumbnail-placeholder::before { width: 240px; height: 150px; content: ''; border: 1px solid rgb(255 255 255 / 65%); border-radius: 50%; transform: rotate(-25deg); }
-.thumbnail-placeholder span { position: absolute; color: #fff; font-size: 64px; font-weight: 750; text-shadow: 0 4px 13px rgb(21 97 105 / 20%); }
-.thumbnail-placeholder i { position: absolute; right: 24px; bottom: 18px; color: rgb(255 255 255 / 75%); font-size: 30px; }
-.featured-placeholder { background: radial-gradient(circle at 70% 30%, #d7e5ff, transparent 34%), linear-gradient(135deg, #2b4b7b, #8bc1dc); }
-.featured-badge { position: absolute; top: 12px; right: 12px; padding: 5px 9px; color: #826120; font-size: 11px; font-weight: 700; background: #fff3cf; border-radius: 999px; }
-.card-hover { position: absolute; right: 12px; bottom: 12px; left: 12px; padding: 10px 12px; color: #fff; font-size: 13px; text-align: center; background: rgb(16 41 58 / 76%); border-radius: 8px; opacity: 0; transform: translateY(8px); transition: opacity .2s, transform .2s; }
-.app-card:hover .card-hover { opacity: 1; transform: translateY(0); }
-.card-hover span { margin-left: 8px; font-size: 16px; }
-.card-info { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 4px 0; }
-.card-info h3 { overflow: hidden; margin: 0 0 6px; color: #1b2d40; font-size: 17px; text-overflow: ellipsis; white-space: nowrap; }
-.card-info p { overflow: hidden; margin: 0; color: #98a2ac; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.more-button { color: #a4afb8; font-size: 21px; letter-spacing: 2px; background: none; border: 0; cursor: pointer; }
-.card-actions { display: flex; gap: 13px; padding: 8px 4px 0; opacity: 0; transition: opacity .2s; }
-.app-card:hover .card-actions { opacity: 1; }
-.card-actions button { padding: 0; color: #55808e; font: inherit; font-size: 12px; background: none; border: 0; cursor: pointer; }
-.card-actions button:last-child { color: #bd6c72; }
 .outline-button, .primary-button, .secondary-button { min-height: 37px; padding: 0 15px; font: inherit; font-size: 13px; border-radius: 7px; cursor: pointer; }
 .outline-button { color: #2c8c84; background: #fff; border: 1px solid #b6e4dc; }
 .primary-button { color: #fff; background: #238f83; border: 1px solid #238f83; }
@@ -306,5 +303,5 @@ watch(() => loginUserStore.loginUser.id, () => void loadMyApps())
 @keyframes shimmer { to { background-position: -200% 0; } }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 900px) { .gallery-shell { padding: 30px 24px 56px; } .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 620px) { .hero-content { padding-top: 52px; } .hero-content h1 { font-size: 48px; } .hero-subtitle { font-size: 15px; } .gallery-shell { width: 100%; margin-top: 0; border-radius: 0; } .section-header { align-items: flex-start; flex-direction: column; } .card-grid { grid-template-columns: 1fr; gap: 22px; } .app-thumbnail { height: 210px; } .login-empty { align-items: flex-start; flex-wrap: wrap; } .login-empty span { flex-basis: calc(100% - 60px); } .login-empty .primary-button { margin-left: 59px; } .search-box { width: 100%; } }
+@media (max-width: 620px) { .hero-content { padding-top: 52px; } .hero-content h1 { font-size: 48px; } .hero-subtitle { font-size: 15px; } .gallery-shell { width: 100%; margin-top: 0; border-radius: 0; } .section-header { align-items: flex-start; flex-direction: column; } .card-grid { grid-template-columns: 1fr; gap: 22px; } .login-empty { align-items: flex-start; flex-wrap: wrap; } .login-empty span { flex-basis: calc(100% - 60px); } .login-empty .primary-button { margin-left: 59px; } .search-box { width: 100%; } }
 </style>

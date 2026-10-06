@@ -60,7 +60,7 @@ public interface AppService extends IService<App> {
     boolean deleteApp(Long appId, User loginUser);
 
     /**
-     * 用户查看自己创建的应用详情。
+     * 登录用户只读查看应用详情。
      *
      * @param appId     应用 id
      * @param loginUser 当前登录用户

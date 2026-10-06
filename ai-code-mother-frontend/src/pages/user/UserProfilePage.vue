@@ -3,7 +3,10 @@ import { computed, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 
 import { updateUser } from '@/api/userController.ts'
+import PageHeader from '@/components/PageHeader.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { useLoginUserStore } from '@/stores/loginUserStore.ts'
+import { formatDateTime } from '@/utils/app.ts'
 
 type UserRole = 'user' | 'admin' | 'ban'
 
@@ -29,12 +32,8 @@ const roleLabel = computed(() => {
   const role = loginUserStore.loginUser.userRole
   return role && role in roleLabels ? roleLabels[role as UserRole] : '普通用户'
 })
-const avatarFallback = computed(() => displayName.value.slice(0, 1).toUpperCase())
-
 const formatDate = (date?: string) => {
-  if (!date) return '暂无记录'
-  const parsedDate = new Date(date)
-  return Number.isNaN(parsedDate.getTime()) ? date : parsedDate.toLocaleString('zh-CN')
+  return formatDateTime(date, '暂无记录')
 }
 
 const resetForm = () => {
@@ -87,25 +86,13 @@ const handleSave = async () => {
 
 <template>
   <section class="profile-page">
-    <header class="page-header">
-      <div>
-        <p class="page-eyebrow">PERSONAL SPACE</p>
-        <h1>个人信息</h1>
-        <p>管理你的平台资料，让 AI 更好地了解你的创作身份。</p>
-      </div>
-      <span class="account-status"><i></i>账号正常</span>
-    </header>
+    <PageHeader eyebrow="PERSONAL SPACE" title="个人信息" description="管理你的平台资料，让 AI 更好地了解你的创作身份。">
+      <template #actions><span class="account-status"><i></i>账号正常</span></template>
+    </PageHeader>
 
     <div class="profile-layout">
       <aside class="profile-summary">
-        <div class="avatar-wrap">
-          <img
-            v-if="loginUserStore.loginUser.userAvatar"
-            :src="loginUserStore.loginUser.userAvatar"
-            :alt="`${displayName}的头像`"
-          />
-          <span v-else>{{ avatarFallback }}</span>
-        </div>
+        <UserAvatar class="avatar-wrap" :avatar="loginUserStore.loginUser.userAvatar" :name="displayName" size="lg" />
         <h2>{{ displayName }}</h2>
         <p class="account-text">@{{ loginUserStore.loginUser.userAccount || '未设置账号' }}</p>
         <span class="role-badge" :class="`role-${loginUserStore.loginUser.userRole || 'user'}`">
@@ -170,37 +157,10 @@ const handleSave = async () => {
   color: #1f2d3d;
 }
 
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
-.page-eyebrow {
-  margin: 0 0 8px;
-  color: #3478d4;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-}
-
 h1,
 h2,
 p {
   margin-top: 0;
-}
-
-h1 {
-  margin-bottom: 8px;
-  color: #152b46;
-  font-size: 30px;
-}
-
-.page-header p:last-child {
-  margin-bottom: 0;
-  color: #728196;
 }
 
 .account-status {
@@ -242,31 +202,7 @@ h1 {
 }
 
 .avatar-wrap {
-  width: 88px;
-  height: 88px;
   margin: 0 auto 16px;
-  overflow: hidden;
-  border: 4px solid #edf5ff;
-  border-radius: 50%;
-}
-
-.avatar-wrap img,
-.avatar-wrap span {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  place-items: center;
-}
-
-.avatar-wrap img {
-  object-fit: cover;
-}
-
-.avatar-wrap span {
-  color: #2679d9;
-  font-size: 30px;
-  font-weight: 700;
-  background: #e8f2ff;
 }
 
 .profile-summary h2 {
@@ -481,7 +417,6 @@ button:disabled {
 }
 
 @media (max-width: 480px) {
-  .page-header,
   .section-heading {
     flex-direction: column;
   }
