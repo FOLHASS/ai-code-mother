@@ -8,6 +8,7 @@ import com.xy.aicodemother.model.dto.chatHistory.ChatHistoryQueryRequest;
 import com.xy.aicodemother.model.entity.ChatHistory;
 import com.xy.aicodemother.model.entity.User;
 import com.xy.aicodemother.model.vo.ChatHistoryVO;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 
 /**
  * 对话历史 服务层。
@@ -21,6 +22,8 @@ public interface ChatHistoryService extends IService<ChatHistory> {
      * 内部写入入口：校验应用存在、消息类型以及对话发起者归属。
      */
     boolean addChatHistory(Long appId, String message, String messageType, Long userId);
+
+    int loadChatHistoryToMemory(long appId, MessageWindowChatMemory chatMemory, int maxCount);
 
     /**
      * 创建者或管理员查询应用历史，默认每批最新 10 条。

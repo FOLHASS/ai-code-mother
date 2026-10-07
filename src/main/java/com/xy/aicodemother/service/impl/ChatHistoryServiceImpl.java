@@ -1,5 +1,6 @@
 package com.xy.aicodemother.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -18,10 +19,15 @@ import com.xy.aicodemother.model.entity.User;
 import com.xy.aicodemother.model.enums.ChatHistoryMessageTypeEnum;
 import com.xy.aicodemother.model.vo.ChatHistoryVO;
 import com.xy.aicodemother.service.ChatHistoryService;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 /**
  * 对话历史服务，集中处理归属校验、消息持久化和分页规则。
@@ -55,6 +61,34 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         boolean result = save(chatHistory);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "对话历史保存失败");
         return true;
+    }
+
+    @Override
+    public int loadChatHistoryToMemory(long appId, MessageWindowChatMemory chatMemory, int maxCount) {
+        QueryWrapper queryWrapper = QueryWrapper.create()
+                .eq(ChatHistory::getAppId, appId)
+                .orderBy(ChatHistory::getCreateTime, false)
+                // 注意从1开始加载数据 因为在执行到这里的时候 已经将用户的第一条消息存入store中了
+                .limit(1, maxCount);
+
+        List<ChatHistory> chatHistories = list(queryWrapper);
+        if(CollUtil.isEmpty(chatHistories)) {
+            return 0;
+        }
+
+        chatHistories = chatHistories.reversed();
+        chatMemory.clear();
+        int count = 0;
+        for(ChatHistory chatHistory : chatHistories) {
+            if(ChatHistoryMessageTypeEnum.AI.getValue().equals(chatHistory.getMessageType())) {
+                chatMemory.add(new AiMessage(chatHistory.getMessage()));
+            }else if(ChatHistoryMessageTypeEnum.USER.getValue().equals(chatHistory.getMessageType())){
+                chatMemory.add(new UserMessage(chatHistory.getMessage()));
+            }
+            count ++;
+        }
+        return count;
+
     }
 
     @Override
