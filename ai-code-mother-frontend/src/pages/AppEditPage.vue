@@ -39,7 +39,7 @@ const loadApp = async () => {
     app.value = response.data.data
     if (!isAdmin.value && String(app.value.userId) !== String(loginUserStore.loginUser.id)) {
       message.warning('只能编辑自己的应用')
-      await router.replace({ path: `/app/${appId.value}`, query: { view: '1' } })
+      await router.replace(`/app/${appId.value}`)
       return
     }
     Object.assign(form, {
@@ -78,7 +78,7 @@ const save = async () => {
     message.success('应用信息已保存')
     await router.push(isAdmin.value
       ? '/admin/appManage'
-      : { path: `/app/${form.id}`, query: { view: '1' } })
+      : `/app/${form.id}`)
   } catch {
     message.error('网络异常，应用信息保存失败')
   } finally {

@@ -1,23 +1,19 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUpdated, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { message, Tooltip } from 'ant-design-vue'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js/lib/common'
 import MarkdownIt from 'markdown-it'
 import { useRoute, useRouter } from 'vue-router'
 
-import { adminGetAppVoById, deploy, getAppVoById, streamChatToGenCode } from '@/api/appController.ts'
+import { adminGetAppVoById, deploy, getAppVoById } from '@/api/appController.ts'
+import { listAppChatHistoryByPage } from '@/api/chatHistoryController.ts'
 import logoUrl from '@/assets/logo.png'
 import { useLoginUserStore } from '@/stores/loginUserStore.ts'
-import { getDeployUrl, getPreviewUrl } from '@/utils/app.ts'
-
-type ChatMessage = {
-  id: number
-  role: 'user' | 'assistant'
-  content: string
-  loading?: boolean
-  error?: boolean
-}
+import { formatDateTime, getDeployUrl, getPreviewUrl } from '@/utils/app.ts'
+import { mergeHistoryMessages, sortHistoryRecords } from '@/utils/chatHistory.ts'
+import type { ChatMessage } from '@/utils/chatHistory.ts'
+import { streamChatToGenCode } from '@/utils/chatStream.ts'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,7 +29,15 @@ const deployedUrl = ref('')
 const messageList = ref<HTMLElement | null>(null)
 const hasSentInitialPrompt = ref(false)
 const hasGeneratedWebsite = ref(false)
+const isLoadingHistory = ref(false)
+const historyLoaded = ref(false)
+const historyError = ref('')
+const hasMoreHistory = ref(false)
+const historyTotal = ref(0)
+const historyCursor = ref<{ lastCreateTime: string; lastId: string } | null>(null)
 let messageId = 0
+let appVersion = 0
+let generationController: AbortController | null = null
 
 const escapeHtml = (value: string) => value
   .replaceAll('&', '&amp;')
@@ -66,8 +70,8 @@ const isOwner = computed(() => Boolean(
   String(app.value.userId) === String(loginUserStore.loginUser.id),
 ))
 const canInteract = computed(() => isOwner.value)
-// 查看入口只展示已有作品；该参数不影响创建者主动继续对话。
-const isViewMode = computed(() => Object.hasOwn(route.query, 'view'))
+const canReadHistory = computed(() => isOwner.value || loginUserStore.loginUser.userRole === 'admin')
+const userMessageLabel = computed(() => isOwner.value ? '你' : app.value?.user?.userName || '用户')
 
 const scrollToBottom = async () => {
   await nextTick()
@@ -76,12 +80,14 @@ const scrollToBottom = async () => {
 
 const appendStreamChunk = (assistantMessage: ChatMessage, chunk: string) => {
   if (!chunk) return
+  const list = messageList.value
+  const shouldScroll = !list || list.scrollHeight - list.scrollTop - list.clientHeight < 80
   assistantMessage.content += chunk
   const index = messages.value.findIndex((item) => item.id === assistantMessage.id)
   if (index >= 0) {
     messages.value[index] = { ...assistantMessage }
   }
-  void scrollToBottom()
+  if (shouldScroll && !isLoadingHistory.value) void scrollToBottom()
 }
 
 const renderAssistantMessage = (content: string) => {
@@ -103,16 +109,120 @@ const copyCode = async (event: MouseEvent) => {
   }
 }
 
+const showPreview = (cacheBust = false) => {
+  if (!app.value) return
+  previewUrl.value = getPreviewUrl(app.value, cacheBust)
+  hasGeneratedWebsite.value = Boolean(previewUrl.value)
+}
+
+const loadHistory = async (loadMore = false, version = appVersion) => {
+  if (!app.value?.id || !canReadHistory.value || isLoadingHistory.value) return false
+  if (loadMore && (!hasMoreHistory.value || !historyCursor.value)) return false
+  isLoadingHistory.value = true
+  historyError.value = ''
+  try {
+    const response = await listAppChatHistoryByPage({
+      appId: app.value.id,
+      pageSize: 10,
+      ...(loadMore ? historyCursor.value : {}),
+    })
+    if (version !== appVersion) return false
+    if (response.data.code !== 0 || !response.data.data) {
+      throw new Error(response.data.message || '对话历史加载失败')
+    }
+    const page = response.data.data
+    const records = sortHistoryRecords(page.records || [])
+    const oldest = records[0]
+    const remaining = Number(page.totalRow ?? records.length)
+    const moreAvailable = records.length > 0 && remaining > records.length
+    if (moreAvailable && (!oldest?.id || !oldest.createTime)) {
+      throw new Error('历史消息的游标信息不完整，请稍后重试')
+    }
+    const list = messageList.value
+    const previousHeight = list?.scrollHeight || 0
+    const previousTop = list?.scrollTop || 0
+    const anchor = list?.querySelector<HTMLElement>('.message-row')
+    const anchorTop = anchor?.getBoundingClientRect().top
+    messages.value = mergeHistoryMessages(loadMore ? messages.value : [], records)
+    historyCursor.value = oldest?.id && oldest.createTime
+      ? { lastId: oldest.id, lastCreateTime: oldest.createTime }
+      : null
+    hasMoreHistory.value = moreAvailable
+    if (!loadMore) {
+      historyLoaded.value = true
+      historyTotal.value = remaining
+      if (remaining >= 2 || records.length >= 2) showPreview()
+      await scrollToBottom()
+    } else {
+      // 在顶部插入旧消息后补偿高度，保持用户正在阅读的位置。
+      await nextTick()
+      if (version === appVersion && list) {
+        list.scrollTop = Math.max(0, previousTop + (anchor?.isConnected && anchorTop !== undefined
+          ? anchor.getBoundingClientRect().top - anchorTop
+          : list.scrollHeight - previousHeight))
+      }
+    }
+    return true
+  } catch (error) {
+    if (version === appVersion) {
+      historyError.value = error instanceof Error ? error.message : '对话历史加载失败，请稍后重试'
+    }
+    return false
+  } finally {
+    if (version === appVersion) isLoadingHistory.value = false
+  }
+}
+
+const initializeHistory = async (version = appVersion) => {
+  const loaded = await loadHistory(false, version)
+  if (!loaded || version !== appVersion) return
+  if (isOwner.value && historyTotal.value === 0 && !messages.value.length
+      && !hasSentInitialPrompt.value && app.value?.initPrompt?.trim()) {
+    hasSentInitialPrompt.value = true
+    isLoadingApp.value = false
+    await sendMessage(app.value.initPrompt, true)
+  }
+}
+
+const retryHistory = () => historyLoaded.value ? loadHistory(true) : initializeHistory()
+
 const loadApp = async () => {
+  const version = ++appVersion
+  generationController?.abort()
+  generationController = null
+  app.value = null
+  messages.value = []
+  input.value = ''
+  previewUrl.value = ''
+  deployedUrl.value = ''
+  hasGeneratedWebsite.value = false
+  hasSentInitialPrompt.value = false
+  historyLoaded.value = false
+  hasMoreHistory.value = false
+  historyCursor.value = null
+  historyError.value = ''
+  historyTotal.value = 0
+  isLoadingHistory.value = false
+  isStreaming.value = false
+  isDeploying.value = false
   if (!appId.value) {
     await router.replace('/')
     return
   }
   isLoadingApp.value = true
   try {
+    // 清理旧链接参数，初始化条件完全由服务端历史记录决定。
+    if (Object.hasOwn(route.query, 'view') || Object.hasOwn(route.query, 'prompt')) {
+      const query = { ...route.query }
+      delete query.view
+      delete query.prompt
+      await router.replace({ path: route.path, query })
+    }
+    if (version !== appVersion) return
     const response = loginUserStore.loginUser.userRole === 'admin'
       ? await adminGetAppVoById({ id: appId.value })
       : await getAppVoById({ id: appId.value })
+    if (version !== appVersion) return
     if (response.data.code !== 0 || !response.data.data) {
       message.error(response.data.message || '应用不存在或无权访问')
       await router.replace('/')
@@ -120,60 +230,66 @@ const loadApp = async () => {
     }
     app.value = response.data.data
     deployedUrl.value = getDeployUrl(app.value)
-    if (isViewMode.value && app.value.codeGenType) {
-      hasGeneratedWebsite.value = true
-      previewUrl.value = getPreviewUrl(app.value)
-    }
-
-    const initialPrompt = typeof route.query.prompt === 'string' ? route.query.prompt.trim() : ''
-    if (!isViewMode.value && !hasSentInitialPrompt.value && canInteract.value && (initialPrompt || app.value.initPrompt?.trim())) {
-      hasSentInitialPrompt.value = true
-      // 消费一次初始生成入口，刷新或后续返回详情时不再自动重发。
-      await router.replace({ path: route.path, query: { ...route.query, prompt: undefined, view: '1' } })
-      await sendMessage(initialPrompt || app.value.initPrompt || '', true)
-    }
+    if (canReadHistory.value) await initializeHistory(version)
+    else showPreview()
   } catch {
+    if (version !== appVersion) return
     message.error('应用加载失败，请稍后重试')
     await router.replace('/')
   } finally {
-    isLoadingApp.value = false
+    if (version === appVersion) isLoadingApp.value = false
   }
 }
 
 const sendMessage = async (value = input.value, isInitial = false) => {
   const content = value.trim()
-  if (!content || isStreaming.value || !app.value?.id || !canInteract.value) return
+  if (!content || isStreaming.value || !app.value?.id || !canInteract.value || !historyLoaded.value) return
+  const version = appVersion
+  const currentAppId = app.value.id
+  const controller = new AbortController()
+  generationController = controller
   if (!isInitial) input.value = ''
 
-  messages.value.push({ id: ++messageId, role: 'user', content })
-  const assistantMessage: ChatMessage = { id: ++messageId, role: 'assistant', content: '', loading: true }
+  messages.value.push({ id: `live-${++messageId}`, role: 'user', content, createTime: new Date().toISOString() })
+  const assistantMessage: ChatMessage = { id: `live-${++messageId}`, role: 'assistant', content: '', loading: true }
   messages.value.push(assistantMessage)
   isStreaming.value = true
   await scrollToBottom()
 
   try {
-    for await (const chunk of streamChatToGenCode({ appId: app.value.id, message: content })) {
+    for await (const chunk of streamChatToGenCode({ appId: currentAppId, message: content }, controller.signal)) {
+      if (version !== appVersion) return
       appendStreamChunk(assistantMessage, chunk)
     }
+    if (version !== appVersion) return
     assistantMessage.loading = false
-    hasGeneratedWebsite.value = true
-    previewUrl.value = getPreviewUrl(app.value, true)
+    assistantMessage.createTime = new Date().toISOString()
+    showPreview(true)
   } catch (error) {
+    if (version !== appVersion || controller.signal.aborted) return
     assistantMessage.loading = false
     assistantMessage.error = true
-    assistantMessage.content = error instanceof Error ? error.message : '生成失败，请稍后重试'
-    message.error(assistantMessage.content)
+    const reason = error instanceof Error ? error.message : '生成失败，请稍后重试'
+    assistantMessage.content = `${assistantMessage.content ? assistantMessage.content + '\n\n' : ''}[生成失败] ${reason}`
+    message.error(reason)
   } finally {
-    isStreaming.value = false
-    await scrollToBottom()
+    if (version === appVersion) {
+      assistantMessage.loading = false
+      const index = messages.value.findIndex((item) => item.id === assistantMessage.id)
+      if (index >= 0) messages.value[index] = { ...assistantMessage }
+      isStreaming.value = false
+      generationController = null
+    }
   }
 }
 
 const handleDeploy = async () => {
   if (!app.value?.id || isDeploying.value || !canInteract.value) return
+  const version = appVersion
   isDeploying.value = true
   try {
     const response = await deploy({ appId: app.value.id })
+    if (version !== appVersion) return
     if (response.data.code !== 0 || !response.data.data) {
       message.error(response.data.message || '部署失败')
       return
@@ -181,9 +297,10 @@ const handleDeploy = async () => {
     deployedUrl.value = response.data.data
     message.success('应用部署成功')
   } catch {
+    if (version !== appVersion) return
     message.error('网络异常，应用部署失败')
   } finally {
-    isDeploying.value = false
+    if (version === appVersion) isDeploying.value = false
   }
 }
 
@@ -203,7 +320,12 @@ onMounted(async () => {
   await loadApp()
 })
 
-onUpdated(() => void scrollToBottom())
+watch(appId, () => void loadApp())
+
+onUnmounted(() => {
+  appVersion += 1
+  generationController?.abort()
+})
 </script>
 
 <template>
@@ -226,16 +348,21 @@ onUpdated(() => void scrollToBottom())
       <section class="conversation-panel">
         <div class="conversation-heading"><div><p>CONVERSATION</p><h1>和 AI 一起完善应用</h1></div><span class="online-indicator"><i></i> {{ isLoadingApp ? '连接中' : isStreaming ? '生成中' : 'AI 在线' }}</span></div>
         <div ref="messageList" class="message-list">
-          <div v-if="!messages.length" class="conversation-empty"><span class="empty-orbit"><i></i></span><strong>{{ isLoadingApp ? '正在连接应用' : canInteract ? '继续完善你的作品' : '作品查看模式' }}</strong><p>{{ isLoadingApp ? '正在读取应用信息' : canInteract ? '发送消息，告诉 AI 你想怎样调整这个应用' : '你可以预览作品，仅创建者可以继续对话' }}</p></div>
+          <div v-if="canReadHistory" class="history-controls">
+            <div v-if="historyError" class="history-error"><span>{{ historyError }}</span><button type="button" :disabled="isLoadingHistory" @click="retryHistory">重试</button></div>
+            <button v-else-if="hasMoreHistory" class="load-history-button" type="button" :disabled="isLoadingHistory" @click="loadHistory(true)">{{ isLoadingHistory ? '正在加载历史...' : '加载更多历史消息' }}</button>
+            <span v-else-if="historyLoaded && messages.length" class="history-start">已加载全部历史消息</span>
+          </div>
+          <div v-if="!messages.length" class="conversation-empty"><span class="empty-orbit"><i></i></span><strong>{{ isLoadingApp || isLoadingHistory ? '正在加载对话' : historyError ? '对话历史加载失败' : canInteract ? '继续完善你的作品' : '作品查看模式' }}</strong><p>{{ isLoadingApp || isLoadingHistory ? '正在读取应用和历史消息' : historyError ? '请重试后继续对话' : canReadHistory ? '发送消息，告诉 AI 你想怎样调整这个应用' : '对话历史仅应用创建者和管理员可见' }}</p></div>
           <article v-for="item in messages" :key="item.id" class="message-row" :class="`message-${item.role}`">
             <img v-if="item.role === 'assistant'" :src="logoUrl" alt="AI" class="message-avatar" />
-            <div class="message-body"><div class="message-meta">{{ item.role === 'user' ? '你' : 'AI 助手' }}</div><div class="message-bubble" :class="{ 'message-error': item.error }"><span v-if="!item.content && item.loading" class="typing-dots"><i></i><i></i><i></i></span><div v-else-if="item.role === 'assistant'" class="markdown-content" v-html="renderAssistantMessage(item.content)" @click="copyCode"></div><pre v-else>{{ item.content }}</pre><span v-if="item.role === 'assistant' && item.loading && item.content" class="streaming-cursor"></span></div></div>
+            <div class="message-body"><div class="message-meta"><span>{{ item.role === 'user' ? userMessageLabel : 'AI 助手' }}</span><time v-if="item.createTime" :datetime="item.createTime">{{ formatDateTime(item.createTime) }}</time></div><div class="message-bubble" :class="{ 'message-error': item.error }"><span v-if="!item.content && item.loading" class="typing-dots"><i></i><i></i><i></i></span><div v-else-if="item.role === 'assistant'" class="markdown-content" v-html="renderAssistantMessage(item.content)" @click="copyCode"></div><pre v-else>{{ item.content }}</pre><span v-if="item.role === 'assistant' && item.loading && item.content" class="streaming-cursor"></span></div></div>
           </article>
         </div>
         <Tooltip :title="!isLoadingApp && !canInteract ? '无法在别人的作品下对话哦~' : undefined" placement="top">
         <form class="chat-composer" :class="{ 'chat-composer--readonly': !canInteract }" @submit.prevent="sendMessage()">
-          <textarea v-model="input" :disabled="isLoadingApp || isStreaming || !isLoggedIn || !canInteract" rows="3" :placeholder="canInteract ? '描述更详细，页面会更具体。按 Enter 发送，Shift + Enter 换行' : '当前为只读预览，仅应用创建者可以继续对话'" @keydown="handleKeydown"></textarea>
-          <div class="composer-footer"><span>{{ isStreaming ? 'AI 正在生成，请稍候...' : canInteract ? '支持连续对话迭代' : '只读查看' }}</span><button type="submit" :disabled="isLoadingApp || isStreaming || !input.trim() || !canInteract"><span aria-hidden="true">↑</span></button></div>
+          <textarea v-model="input" :disabled="isLoadingApp || isStreaming || !isLoggedIn || !canInteract || !historyLoaded" rows="3" :placeholder="canInteract ? '描述更详细，页面会更具体。按 Enter 发送，Shift + Enter 换行' : '当前为只读预览，仅应用创建者可以继续对话'" @keydown="handleKeydown"></textarea>
+          <div class="composer-footer"><span>{{ isStreaming ? 'AI 正在生成，请稍候...' : canInteract ? '支持连续对话迭代' : '只读查看' }}</span><button type="submit" :disabled="isLoadingApp || isStreaming || !input.trim() || !canInteract || !historyLoaded"><span aria-hidden="true">↑</span></button></div>
         </form>
         </Tooltip>
       </section>
@@ -275,7 +402,12 @@ onUpdated(() => void scrollToBottom())
 .conversation-heading h1, .preview-heading h2 { margin: 0; color: #1c344a; font-size: 18px; font-weight: 650; }
 .online-indicator, .preview-status { display: inline-flex; align-items: center; gap: 6px; padding: 7px 9px; color: #328675; font-size: 11px; background: #f0faf7; border-radius: 999px; white-space: nowrap; }
 .online-indicator i, .preview-status i { width: 6px; height: 6px; background: #29b78a; border-radius: 50%; }
-.message-list { flex: 1; min-height: 0; padding: 18px 20px; overflow-y: auto; scroll-behavior: smooth; }
+.message-list { flex: 1; min-height: 0; padding: 18px 20px; overflow-y: auto; overflow-anchor: none; }
+.history-controls { margin-bottom: 18px; text-align: center; }
+.load-history-button, .history-error button { padding: 6px 12px; color: #328675; font: inherit; font-size: 12px; background: #f0faf7; border: 1px solid #dcece7; border-radius: 7px; cursor: pointer; }
+.load-history-button:disabled, .history-error button:disabled { cursor: wait; opacity: .6; }
+.history-start { color: #a0adb3; font-size: 11px; }
+.history-error { display: flex; align-items: center; justify-content: center; gap: 10px; color: #b6535d; font-size: 12px; }
 .conversation-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 240px; color: #9eacb3; text-align: center; }
 .conversation-empty span { display: grid; width: 44px; height: 44px; margin-bottom: 12px; color: #fff; font-size: 23px; place-items: center; background: #57baa9; border-radius: 14px; }
 .empty-orbit::before, .empty-orbit::after { width: 14px; height: 14px; content: ''; border: 2px solid rgb(255 255 255 / 65%); border-radius: 50%; animation: orbit 1.8s linear infinite; }
@@ -287,7 +419,8 @@ onUpdated(() => void scrollToBottom())
 .message-avatar { flex: 0 0 29px; width: 29px; height: 29px; margin-top: 20px; border-radius: 9px; }
 .message-body { min-width: 0; }
 .message-user .message-body { text-align: right; }
-.message-meta { margin: 0 3px 6px; color: #9ba9b1; font-size: 10px; }
+.message-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 3px 6px; color: #9ba9b1; font-size: 10px; }
+.message-user .message-meta { justify-content: flex-end; }
 .message-bubble { padding: 11px 13px; color: #455b69; font-size: 13px; line-height: 1.65; text-align: left; background: #f4f8f8; border-radius: 4px 12px 12px 12px; }
 .message-user .message-bubble { color: #fff; background: #2b9387; border-radius: 12px 4px 12px 12px; }
 .message-bubble pre { max-width: 100%; margin: 0; overflow-x: auto; overflow-wrap: anywhere; white-space: pre-wrap; font: inherit; }

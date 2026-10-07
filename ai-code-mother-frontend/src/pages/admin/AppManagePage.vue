@@ -111,7 +111,7 @@ const openDetails = (app: API.AppVO) => {
 }
 
 const openApp = (app: API.AppVO) => {
-  if (app.id) void router.push({ path: `/app/${app.id}`, query: { view: '1' } })
+  if (app.id) void router.push(`/app/${app.id}`)
 }
 
 const editApp = (app: API.AppVO) => {

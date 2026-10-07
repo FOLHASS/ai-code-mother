@@ -1,129 +1,6 @@
+// @ts-ignore
 /* eslint-disable */
-import request, { API_BASE_URL } from '@/request'
-
-/**
- * 读取代码生成 SSE。后端返回 ServerSentEvent<String>，使用原生 fetch
- * 保留流式响应能力；如果服务端返回普通 JSON，也兼容读取最终结果。
- */
-export async function* streamChatToGenCode(params: API.chatToGenCodeParams) {
-  const query = new URLSearchParams({
-    appId: String(params.appId),
-    message: params.message,
-  })
-  const response = await fetch(`${API_BASE_URL}/app/chat/gen/code?${query.toString()}`, {
-    method: 'GET',
-    credentials: 'include',
-    headers: {
-      Accept: 'text/event-stream, application/json',
-    },
-  })
-
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      window.location.href = `/user/login?redirect=${encodeURIComponent(window.location.href)}`
-    }
-    throw new Error(`代码生成请求失败（${response.status}）`)
-  }
-
-  if (!response.body) {
-    return
-  }
-
-  const contentType = response.headers.get('content-type') || ''
-  if (contentType.includes('application/json') && !contentType.includes('text/event-stream')) {
-    const body = (await response.json()) as { code?: number; data?: string; message?: string }
-    if (body.code !== undefined && body.code !== 0) {
-      throw new Error(body.message || '代码生成失败')
-    }
-    if (body.data) {
-      yield body.data
-    }
-    return
-  }
-
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-
-  const parseEvent = (event: string) => {
-    const eventType = event
-      .split(/\r?\n/)
-      .find((line) => line.startsWith('event:'))
-      ?.slice(6)
-      .trim()
-
-    const data = event
-      .split(/\r?\n/)
-      .filter((line) => line.startsWith('data:'))
-      .map((line) => line.slice(5).replace(/^ /, ''))
-      .join('\n')
-
-    if (eventType === 'done' || data === '[DONE]') {
-      return { type: 'done' as const, content: '' }
-    }
-    if (eventType === 'error') {
-      try {
-        const payload = JSON.parse(data) as { message?: unknown }
-        return {
-          type: 'error' as const,
-          content: typeof payload.message === 'string' ? payload.message : '代码生成失败',
-        }
-      } catch {
-        return { type: 'error' as const, content: data || '代码生成失败' }
-      }
-    }
-    if (!data) {
-      return null
-    }
-
-    try {
-      const parsed: unknown = JSON.parse(data)
-      if (typeof parsed === 'string') return { type: 'chunk' as const, content: parsed }
-      if (parsed && typeof parsed === 'object') {
-        const payload = parsed as { d?: unknown; data?: unknown; message?: unknown }
-        if (typeof payload.d === 'string') return { type: 'chunk' as const, content: payload.d }
-        if (typeof payload.data === 'string') return { type: 'chunk' as const, content: payload.data }
-        if (typeof payload.message === 'string') return { type: 'error' as const, content: payload.message }
-      }
-      return { type: 'chunk' as const, content: data }
-    } catch {
-      return { type: 'chunk' as const, content: data }
-    }
-  }
-
-  // 按 SSE 标准逐行消费，避免依赖网络 chunk 的边界。
-  while (true) {
-    const { done, value } = await reader.read()
-    buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
-
-    const lines = buffer.split(/\r\n|\n|\r/)
-    buffer = lines.pop() || ''
-    let eventLines: string[] = []
-    for (const line of lines) {
-      if (line === '') {
-        const parsed = parseEvent(eventLines.join('\n'))
-        eventLines = []
-        if (parsed?.type === 'error') throw new Error(parsed.content)
-        if (parsed?.type === 'done') return
-        if (parsed?.type === 'chunk') yield parsed.content
-      } else if (!line.startsWith(':')) {
-        eventLines.push(line)
-      }
-    }
-
-    if (done) {
-      if (buffer) eventLines.push(buffer)
-      const parsed = parseEvent(eventLines.join('\n'))
-      if (parsed?.type === 'error') {
-        throw new Error(parsed.content)
-      }
-      if (parsed?.type === 'chunk') {
-        yield parsed.content
-      }
-      break
-    }
-  }
-}
+import request from '@/request'
 
 /** 此处后端没有提供注释 POST /app/add */
 export async function addApp(body: API.AppAddRequest, options?: { [key: string]: any }) {
@@ -200,7 +77,7 @@ export async function chatToGenCode(
   params: API.chatToGenCodeParams,
   options?: { [key: string]: any }
 ) {
-  return request<API.ServerSentEventString[]>('/app/chat/gen/code', {
+  return request<API.SseEmitter>('/app/chat/gen/code', {
     method: 'GET',
     params: {
       ...params,

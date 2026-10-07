@@ -20,15 +20,18 @@ import com.xy.aicodemother.model.dto.app.AppUpdateRequest;
 import com.xy.aicodemother.model.entity.App;
 import com.xy.aicodemother.model.entity.User;
 import com.xy.aicodemother.model.enums.CodeGenTypeEnum;
+import com.xy.aicodemother.model.enums.ChatHistoryMessageTypeEnum;
 import com.xy.aicodemother.model.vo.AppVO;
 import com.xy.aicodemother.model.vo.UserVO;
 import com.xy.aicodemother.service.AppService;
+import com.xy.aicodemother.service.ChatHistoryService;
 import com.xy.aicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -57,6 +60,10 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private UserService userService;
     @Resource
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
+    @Resource
+    private ChatHistoryService chatHistoryService;
+    @Resource
+    private AppMapper appMapper;
 
 
     @Override
@@ -67,28 +74,43 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         App app = getOwnedApp(appId, loginUser);
         CodeGenTypeEnum codeGenType = CodeGenTypeEnum.getEnumByValue(app.getCodeGenType());
 
-        // 使用非流式生成入口；该调用会等待 AI 返回、代码解析和文件保存全部完成。
-        return aiCodeGeneratorFacade.generateAndSaveCodeStream(userMessage, codeGenType, appId)
-                .map(chunk -> {
-                    log.info("SSE payload: length={}, appId={}", chunk.length(), appId);
-                    Map<String, String> wrapper = Map.of("d", chunk);
-                    String jsonStr = JSONUtil.toJsonStr(wrapper);
-                    return ServerSentEvent.<String>builder()
-                            .data(jsonStr)
-                            .build();
-                })
-                .concatWith(Mono.just(ServerSentEvent.<String>builder()
-                        .event("done")
-                        .data("")
-                        .build()))
-                .onErrorResume(error -> {
-                    log.error("代码生成流失败，appId={}", appId, error);
-                    String errorMessage = StrUtil.blankToDefault(error.getMessage(), "代码生成失败，请稍后重试");
-                    return Mono.just(ServerSentEvent.<String>builder()
-                            .event("error")
-                            .data(JSONUtil.toJsonStr(Map.of("message", errorMessage)))
-                            .build());
-                });
+        Long userId = loginUser.getId();
+        return Flux.defer(() -> {
+            // 先落库用户消息，再调用 AI；不把整个耗时生成过程放进数据库事务。
+            saveChatMessage(appId, userMessage, ChatHistoryMessageTypeEnum.USER, userId);
+            StringBuilder aiMessage = new StringBuilder();
+            // defer 同时捕获生成入口同步抛错和流式响应中的异步错误。
+            return Flux.defer(() -> aiCodeGeneratorFacade.generateAndSaveCodeStream(userMessage, codeGenType, appId))
+                    .map(chunk -> {
+                        aiMessage.append(chunk);
+                        return ServerSentEvent.<String>builder()
+                                .data(JSONUtil.toJsonStr(Map.of("d", chunk)))
+                                .build();
+                    })
+                    .concatWith(Mono.fromCallable(() -> {
+                        String completeMessage = aiMessage.toString();
+                        ThrowUtils.throwIf(StrUtil.isBlank(completeMessage), ErrorCode.OPERATION_ERROR, "AI 未返回有效内容");
+                        // 文件保存和 AI 历史保存均成功后，才发送 done 事件。
+                        saveChatMessage(appId, completeMessage, ChatHistoryMessageTypeEnum.AI, userId);
+                        return ServerSentEvent.<String>builder().event("done").data("").build();
+                    }))
+                    .onErrorResume(error -> Mono.fromCallable(() -> {
+                        log.error("代码生成流失败，appId={}", appId, error);
+                        String errorMessage = StrUtil.blankToDefault(error.getMessage(), "代码生成失败，请稍后重试");
+                        String failedMessage = (aiMessage.isEmpty() ? "" : aiMessage + "\n\n")
+                                + "[生成失败] " + errorMessage;
+                        saveChatMessage(appId, failedMessage, ChatHistoryMessageTypeEnum.AI, userId);
+                        return ServerSentEvent.<String>builder()
+                                .event("error")
+                                .data(JSONUtil.toJsonStr(Map.of("message", errorMessage)))
+                                .build();
+                    }));
+        });
+    }
+
+    private void saveChatMessage(Long appId, String message, ChatHistoryMessageTypeEnum messageType, Long userId) {
+        boolean result = chatHistoryService.addChatHistory(appId, message, messageType.getValue(), userId);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "对话历史保存失败");
     }
 
     /**
@@ -196,6 +218,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean deleteApp(Long appId, User loginUser) {
         getOwnedApp(appId, loginUser);
         return adminDeleteApp(appId);
@@ -227,14 +250,22 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean adminDeleteApp(Long appId) {
-        App existingApp = getExistingApp(appId);
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 id 不合法");
+        App existingApp = appMapper.selectOneByQuery(QueryWrapper.create().eq("id", appId).forUpdate());
+        ThrowUtils.throwIf(existingApp == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
         // 删除了应用 同时也应该删除本地生成的文件
         boolean isDeleteCodeOutput = FileUtil.del(AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + existingApp.getCodeGenType() + "_" + existingApp.getId());
         ThrowUtils.throwIf(!isDeleteCodeOutput, ErrorCode.SYSTEM_ERROR, "应用文件删除失败");
         // 如果已经部署，也应该删除部署的文件
-        boolean isDeleteCodeDeploy = FileUtil.del(AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + existingApp.getDeployKey());
-        ThrowUtils.throwIf(!isDeleteCodeDeploy, ErrorCode.SYSTEM_ERROR, "应用部署文件删除失败");
+        if (StrUtil.isNotBlank(existingApp.getDeployKey())) {
+            boolean isDeleteCodeDeploy = FileUtil.del(AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + existingApp.getDeployKey());
+            ThrowUtils.throwIf(!isDeleteCodeDeploy, ErrorCode.SYSTEM_ERROR, "应用部署文件删除失败");
+        }
+        // 相应的删除对应App的历史记录
+        boolean historyDeleted = chatHistoryService.deleteByAppId(appId);
+        ThrowUtils.throwIf(!historyDeleted, ErrorCode.OPERATION_ERROR, "对话历史删除失败");
         // 从数据库删除该应用
         boolean result = this.removeById(appId);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "应用删除失败");

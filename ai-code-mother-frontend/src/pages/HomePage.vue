@@ -92,10 +92,7 @@ const submitPrompt = async () => {
       message.error(response.data.message || '应用创建失败')
       return
     }
-    await router.push({
-      path: `/app/${response.data.data}`,
-      query: { prompt: initPrompt },
-    })
+    await router.push(`/app/${response.data.data}`)
   } catch {
     message.error('网络异常，应用创建失败')
   } finally {
@@ -104,7 +101,7 @@ const submitPrompt = async () => {
 }
 
 const openApp = (app: API.AppVO) => {
-  if (app.id) void router.push({ path: `/app/${app.id}`, query: { view: '1' } })
+  if (app.id) void router.push(`/app/${app.id}`)
 }
 
 const editApp = (app: API.AppVO) => {

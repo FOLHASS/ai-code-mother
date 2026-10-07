@@ -18,6 +18,7 @@ const menuItems = computed<MenuProps['items']>(() => [
   ...(loginUserStore.loginUser.userRole === 'admin'
     ? [
         { key: '/admin/appManage', label: '应用管理' },
+        { key: '/admin/chatHistoryManage', label: '对话管理' },
         { key: '/admin/userManage', label: '用户管理' },
       ]
     : []),
