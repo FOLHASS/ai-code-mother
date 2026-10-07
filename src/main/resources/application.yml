@@ -1,4 +1,7 @@
 spring:
+  session:
+    store-type: redis
+    timeout: 259200
   application:
     name: ai-code-mother-backend
     # mysql
@@ -20,6 +23,9 @@ server:
   port: 8123
   servlet:
     context-path: /api
+    session:
+      cookie:
+        max-age: 259200
 
 # 当前未使用 Redis 向量存储，避免 starter 自动创建缺少专用参数的 EmbeddingStore。
 langchain4j:
