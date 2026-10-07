@@ -95,7 +95,6 @@ public class AiCodeGeneratorFacade {
         return codeStream
                 .doOnNext(chunk -> {
                     int index = chunkIndex.incrementAndGet();
-                    log.info("AI stream chunk #{}: length={}, appId={}", index, chunk.length(), appId);
                     codeBuilder.append(chunk);
                 })
                 .concatWith(Mono.defer(() -> {
