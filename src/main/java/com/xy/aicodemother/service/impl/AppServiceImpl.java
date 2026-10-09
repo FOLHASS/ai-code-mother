@@ -8,6 +8,7 @@ import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.xy.aicodemother.constant.AppConstant;
+import com.xy.aicodemother.ai.tools.ProjectBuildService;
 import com.xy.aicodemother.core.AiCodeGeneratorFacade;
 import com.xy.aicodemother.exception.BusinessException;
 import com.xy.aicodemother.exception.ErrorCode;
@@ -32,6 +33,8 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -65,14 +68,17 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private AppMapper appMapper;
 
+    @Resource
+    private ProjectBuildService projectBuildService;
+
 
     @Override
     public Flux<ServerSentEvent<String>> chatToGenCode(Long appId, String userMessage, User loginUser) {
         ThrowUtils.throwIf(StrUtil.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "生成需求不能为空");
-
         // 仅应用创建者可以触发代码生成。
         App app = getOwnedApp(appId, loginUser);
         CodeGenTypeEnum codeGenType = CodeGenTypeEnum.getEnumByValue(app.getCodeGenType());
+        ThrowUtils.throwIf(codeGenType == null, ErrorCode.PARAMS_ERROR, "代码生成类型不存在");
 
         Long userId = loginUser.getId();
         return Flux.defer(() -> {
@@ -139,7 +145,11 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
 
 
-        File sourceFile = new File(sourceDirPath);
+        // 工程应用部署成功发布的 dist，避免将源码和 node_modules 复制到公开站点。
+        // 原生 HTML 和多文件应用仍使用现有生成目录，部署域名及 deployKey 规则保持一致。
+        File sourceFile = CodeGenTypeEnum.VUE_PROJECT.getValue().equals(codeGenType)
+                ? projectBuildService.getPublishedDirectory(appId).toFile()
+                : new File(sourceDirPath);
         if (!sourceFile.exists() || !sourceFile.isDirectory()) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "部署目录不存在");
         }
@@ -255,9 +265,13 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 id 不合法");
         App existingApp = appMapper.selectOneByQuery(QueryWrapper.create().eq("id", appId).forUpdate());
         ThrowUtils.throwIf(existingApp == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
-        // 删除了应用 同时也应该删除本地生成的文件
-        boolean isDeleteCodeOutput = FileUtil.del(AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + existingApp.getCodeGenType() + "_" + existingApp.getId());
-        ThrowUtils.throwIf(!isDeleteCodeOutput, ErrorCode.SYSTEM_ERROR, "应用文件删除失败");
+        boolean vueProject = CodeGenTypeEnum.VUE_PROJECT.getValue().equals(existingApp.getCodeGenType());
+        // Vue 工程包含源码、构建快照和预览产物，数据库提交成功后统一清理。
+        // 原生模式保留已有文件清理规则。
+        if (!vueProject) {
+            boolean isDeleteCodeOutput = FileUtil.del(AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + existingApp.getCodeGenType() + "_" + existingApp.getId());
+            ThrowUtils.throwIf(!isDeleteCodeOutput, ErrorCode.SYSTEM_ERROR, "应用文件删除失败");
+        }
         // 如果已经部署，也应该删除部署的文件
         if (StrUtil.isNotBlank(existingApp.getDeployKey())) {
             boolean isDeleteCodeDeploy = FileUtil.del(AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + existingApp.getDeployKey());
@@ -269,7 +283,35 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 从数据库删除该应用
         boolean result = this.removeById(appId);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "应用删除失败");
+        if (vueProject) {
+            cleanupVueProjectAfterCommit(appId);
+        }
         return true;
+    }
+
+    /**
+     * 数据库删除提交后再清理工程，避免事务回滚却把应用永久标记为已删除。
+     * 工程服务使用同一应用锁等待构建结束，并拒绝旧 AI 流后续的文件工具调用。
+     */
+    private void cleanupVueProjectAfterCommit(Long appId) {
+        Runnable cleanup = () -> {
+            try {
+                projectBuildService.deleteProjectArtifacts(appId);
+            } catch (RuntimeException e) {
+                // 数据库已提交，资源清理错误只能记录并由运维重试，不能伪装成数据库回滚。
+                log.error("应用已删除，但工程资源清理失败，appId={}", appId, e);
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    cleanup.run();
+                }
+            });
+        } else {
+            cleanup.run();
+        }
     }
 
     @Override

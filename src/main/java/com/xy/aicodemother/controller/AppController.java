@@ -18,6 +18,7 @@ import com.xy.aicodemother.service.AppService;
 import com.xy.aicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -53,33 +54,11 @@ public class AppController {
 
 
     @GetMapping(value = "/chat/gen/code", produces = "text/event-stream")
-    public SseEmitter chatToGenCode(@RequestParam Long appId,
-                                    @RequestParam String message,
-                                    HttpServletRequest request) {
+    public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
+                                               @RequestParam String message,
+                                               HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
-        SseEmitter emitter = new SseEmitter(0L);
-        AtomicInteger eventIndex = new AtomicInteger();
-        emitter.onTimeout(emitter::complete);
-        emitter.onError(error -> emitter.completeWithError(error));
-        appService.chatToGenCode(appId, message, loginUser)
-                .subscribe(event -> {
-                    try {
-                        if ("done".equals(event.event())) {
-                            emitter.send(SseEmitter.event().name("done").data(""));
-                        } else if ("error".equals(event.event())) {
-                            emitter.send(SseEmitter.event().name("error").data(event.data()));
-                            emitter.complete();
-                        } else {
-                            int index = eventIndex.incrementAndGet();
-                            System.out.println("SSE send #" + index + ", data length="
-                                    + String.valueOf(event.data()).length());
-                            emitter.send(SseEmitter.event().data(event.data()));
-                        }
-                    } catch (Exception sendError) {
-                        emitter.completeWithError(sendError);
-                    }
-                }, emitter::completeWithError, emitter::complete);
-        return emitter;
+        return appService.chatToGenCode(appId, message, loginUser);
     }
 
 

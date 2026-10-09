@@ -3,6 +3,7 @@ package com.xy.aicodemother.core;
 
 import com.xy.aicodemother.ai.AiCodeGeneratorService;
 import com.xy.aicodemother.ai.AiCodeGeneratorServiceFactory;
+import com.xy.aicodemother.ai.tools.ProjectBuildService;
 import com.xy.aicodemother.ai.model.HtmlCodeResult;
 import com.xy.aicodemother.ai.model.MultiFileCodeResult;
 import com.xy.aicodemother.core.parser.CodeParseStrategyContext;
@@ -16,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
 
@@ -24,6 +26,9 @@ import java.io.File;
 public class AiCodeGeneratorFacade {
     @Resource
     private AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
+
+    @Resource
+    private ProjectBuildService projectBuildService;
 
     /**
      * 统一入口：根据类型生成并保存代码
@@ -35,7 +40,7 @@ public class AiCodeGeneratorFacade {
     public File generateAndSaveCode(String userMessage, CodeGenTypeEnum codeGenTypeEnum, long appId) {
         ThrowUtils.throwIf(codeGenTypeEnum == null, ErrorCode.SYSTEM_ERROR, "生成类型为空");
 
-        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId);
+        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
         return switch (codeGenTypeEnum) {
             case HTML -> {
                 HtmlCodeResult result = aiCodeGeneratorService.generateHtmlCode(userMessage);
@@ -62,7 +67,8 @@ public class AiCodeGeneratorFacade {
         ThrowUtils.throwIf(codeGenTypeEnum == null, ErrorCode.SYSTEM_ERROR, "生成类型为空");
 
         // 根据工厂为每一个App去创建一个AI服务
-        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId);
+        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory
+                .getAiCodeGeneratorService(appId, codeGenTypeEnum);
 
         return switch (codeGenTypeEnum) {
             case HTML -> {
@@ -72,6 +78,15 @@ public class AiCodeGeneratorFacade {
             case MULTI_FILE -> {
                 Flux<String> codeStream = aiCodeGeneratorService.generateMultiFileCodeStream(userMessage);
                 yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE, appId);
+            }
+            case VUE_PROJECT -> {
+                Flux<String> codeStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
+                // Vue 工程由文件工具逐个落盘，不再按 HTML/CSS/JS 三段文本解析。
+                // 模型输出结束后再次确认当前源码已成功构建、发布；失败会进入上层 error 流程。
+                // 阻塞的构建任务使用独立线程，避免阻塞模型的流式 HTTP 回调。
+                yield codeStream.concatWith(Mono.<String>fromRunnable(
+                                () -> projectBuildService.ensurePreview(appId))
+                        .subscribeOn(Schedulers.boundedElastic()));
             }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();

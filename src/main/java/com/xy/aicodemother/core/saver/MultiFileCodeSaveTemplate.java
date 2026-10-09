@@ -11,8 +11,9 @@ public class MultiFileCodeSaveTemplate extends AbstractCodeSaveTemplate<MultiFil
 
     @Override
     protected void saveFiles(MultiFileCodeResult result, String baseDirPath) {
-        writeToFile(baseDirPath, "index.html", result.getHtmlCode());
-        writeToFile(baseDirPath, "style.css", result.getCssCode());
-        writeToFile(baseDirPath, "script.js", result.getJsCode());
+        // 避免单文件为空的时候影响保存整个流程
+        writeToFile(baseDirPath, "index.html", result.getHtmlCode() != null ? result.getHtmlCode() : "");
+        writeToFile(baseDirPath, "style.css", result.getCssCode() != null ? result.getCssCode() : "");
+        writeToFile(baseDirPath, "script.js", result.getJsCode() != null ? result.getJsCode() : "");
     }
 }
