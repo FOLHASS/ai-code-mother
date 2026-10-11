@@ -159,5 +159,5 @@ public interface AppService extends IService<App> {
      * @param loginUser   当前登录用户
      * @return 完整生成结果
      */
-    Flux<ServerSentEvent<String>> chatToGenCode(Long appId, String userMessage, User loginUser);
+    Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser);
 }

@@ -7,9 +7,13 @@ import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
+import com.xy.aicodemother.ai.AiCodeGenTypeRoutingService;
+import com.xy.aicodemother.ai.AiCodeGenTypeRoutingServiceFactory;
 import com.xy.aicodemother.constant.AppConstant;
+import com.xy.aicodemother.ai.model.AiResponseMessage;
 import com.xy.aicodemother.ai.tools.ProjectBuildService;
 import com.xy.aicodemother.core.AiCodeGeneratorFacade;
+import com.xy.aicodemother.core.handler.StreamHandlerExecutor;
 import com.xy.aicodemother.exception.BusinessException;
 import com.xy.aicodemother.exception.ErrorCode;
 import com.xy.aicodemother.exception.ThrowUtils;
@@ -67,51 +71,43 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private ChatHistoryService chatHistoryService;
     @Resource
     private AppMapper appMapper;
+    @Resource
+    private StreamHandlerExecutor streamHandlerExecutor;
+    @Resource
+    private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
 
     @Resource
     private ProjectBuildService projectBuildService;
 
 
     @Override
-    public Flux<ServerSentEvent<String>> chatToGenCode(Long appId, String userMessage, User loginUser) {
+    public Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser) {
+        // 校验生成需求
         ThrowUtils.throwIf(StrUtil.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "生成需求不能为空");
         // 仅应用创建者可以触发代码生成。
         App app = getOwnedApp(appId, loginUser);
+        // 获取代码生成类型
         CodeGenTypeEnum codeGenType = CodeGenTypeEnum.getEnumByValue(app.getCodeGenType());
+        // 校验生成类型
         ThrowUtils.throwIf(codeGenType == null, ErrorCode.PARAMS_ERROR, "代码生成类型不存在");
-
+        // 获取当前登录用户
         Long userId = loginUser.getId();
-        return Flux.defer(() -> {
-            // 先落库用户消息，再调用 AI；不把整个耗时生成过程放进数据库事务。
-            saveChatMessage(appId, userMessage, ChatHistoryMessageTypeEnum.USER, userId);
-            StringBuilder aiMessage = new StringBuilder();
-            // defer 同时捕获生成入口同步抛错和流式响应中的异步错误。
-            return Flux.defer(() -> aiCodeGeneratorFacade.generateAndSaveCodeStream(userMessage, codeGenType, appId))
-                    .map(chunk -> {
-                        aiMessage.append(chunk);
-                        return ServerSentEvent.<String>builder()
-                                .data(JSONUtil.toJsonStr(Map.of("d", chunk)))
-                                .build();
-                    })
-                    .concatWith(Mono.fromCallable(() -> {
-                        String completeMessage = aiMessage.toString();
-                        ThrowUtils.throwIf(StrUtil.isBlank(completeMessage), ErrorCode.OPERATION_ERROR, "AI 未返回有效内容");
-                        // 文件保存和 AI 历史保存均成功后，才发送 done 事件。
-                        saveChatMessage(appId, completeMessage, ChatHistoryMessageTypeEnum.AI, userId);
-                        return ServerSentEvent.<String>builder().event("done").data("").build();
-                    }))
-                    .onErrorResume(error -> Mono.fromCallable(() -> {
-                        log.error("代码生成流失败，appId={}", appId, error);
-                        String errorMessage = StrUtil.blankToDefault(error.getMessage(), "代码生成失败，请稍后重试");
-                        String failedMessage = (aiMessage.isEmpty() ? "" : aiMessage + "\n\n")
-                                + "[生成失败] " + errorMessage;
-                        saveChatMessage(appId, failedMessage, ChatHistoryMessageTypeEnum.AI, userId);
-                        return ServerSentEvent.<String>builder()
-                                .event("error")
-                                .data(JSONUtil.toJsonStr(Map.of("message", errorMessage)))
-                                .build();
-                    }));
-        });
+        // 先落库用户消息，再调用 AI；不把整个耗时生成过程放进数据库事务。
+        saveChatMessage(appId, userMessage, ChatHistoryMessageTypeEnum.USER, userId);
+        StringBuilder aiMessage = new StringBuilder();
+        // 根据代码生成类型，调用不同的 AI 生成代码， 得到代码流
+        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeMessageStream(userMessage, codeGenType, appId);
+        /**
+         * 更具不同的代码类型，进行代码流的处理
+         * （一） html 和 multi——file 的生成代码流
+         * 1. 拼接 AI 消息，并转换为 SSE
+         * 2. 出现异常时保存失败消息，并发送 error 事件
+         * （二）vue——project 的生成代码流
+         * 1. 前两部同上
+         * 2. 增加核心逻辑： 根据AI不同的响应结果实现给前端不同的展示逻辑
+         */
+        return streamHandlerExecutor.doExecute(codeStream, chatHistoryService, appId, loginUser, codeGenType);
+
     }
 
     private void saveChatMessage(Long appId, String message, ChatHistoryMessageTypeEnum messageType, Long userId) {
@@ -121,6 +117,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     /**
      * 部署应用。
+     *
      * @param appId
      * @param loginUser
      * @return
@@ -144,12 +141,17 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         String sourceDirName = codeGenType + "_" + appId;
         String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
 
+        // todo 实现vue-project逻辑的部署
+        /**
+         * 1. 现npm i
+         * 2. npm run build （LLM保证一定能build通过）
+         * 3. 移动构建生成的文件到deploy目录下
+         */
 
+        // todo 下面的逻辑都得重新改
         // 工程应用部署成功发布的 dist，避免将源码和 node_modules 复制到公开站点。
         // 原生 HTML 和多文件应用仍使用现有生成目录，部署域名及 deployKey 规则保持一致。
-        File sourceFile = CodeGenTypeEnum.VUE_PROJECT.getValue().equals(codeGenType)
-                ? projectBuildService.getPublishedDirectory(appId).toFile()
-                : new File(sourceDirPath);
+        File sourceFile = CodeGenTypeEnum.VUE_PROJECT.getValue().equals(codeGenType) ? projectBuildService.getPublishedDirectory(appId).toFile() : new File(sourceDirPath);
         if (!sourceFile.exists() || !sourceFile.isDirectory()) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "部署目录不存在");
         }
@@ -167,7 +169,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         updateApp.setDeployKey(deployKey);
         updateApp.setDeployedTime(LocalDateTime.now());
         boolean result = updateById(updateApp);
-        if(!result){
+        if (!result) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "应用部署失败");
         }
         log.info("应用部署成功，appId={}, deployKey={}", appId, deployKey);
@@ -189,8 +191,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
         // 初始化 prompt 是创建应用的唯一必填业务字段。
         String initPrompt = StrUtil.trim(appAddRequest.getInitPrompt());
-        ThrowUtils.throwIf(StrUtil.isBlank(initPrompt), ErrorCode.PARAMS_ERROR,
-                "应用初始化 prompt 不能为空");
+        ThrowUtils.throwIf(StrUtil.isBlank(initPrompt), ErrorCode.PARAMS_ERROR, "应用初始化 prompt 不能为空");
 
         // 构造实体时只写入后端允许用户提交和系统负责生成的字段。
         App app = new App();
@@ -200,8 +201,10 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 暂时使用 prompt 前 12 个字符作为默认应用名称，避免创建后名称为空。
         app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
 
-        // 当前系统支持 html 和 multi_file 两种类型，这里选择已有的多文件模式。
-        app.setCodeGenType(CodeGenTypeEnum.MULTI_FILE.getValue());
+        // 调用AI实现模式的选择
+        CodeGenTypeEnum codeGenType = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
+        log.info("AI 生成代码类型：{}", codeGenType);
+        app.setCodeGenType(codeGenType.getValue());
         app.setPriority(AppConstant.DEFAULT_APP_PRIORITY);
 
         boolean saveResult = this.save(app);
@@ -349,8 +352,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
      * 校验登录用户；服务层不依赖 HTTP 请求或 Session。
      */
     private Long getLoginUserId(User loginUser) {
-        ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null,
-                ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
+        ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null, ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
         return loginUser.getId();
     }
 
@@ -379,18 +381,15 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
      */
     private void validatePageRequest(AppQueryRequest appQueryRequest, boolean limitPageSize) {
         ThrowUtils.throwIf(appQueryRequest == null, ErrorCode.PARAMS_ERROR, "请求参数为空");
-        ThrowUtils.throwIf(appQueryRequest.getPageNum() <= 0 || appQueryRequest.getPageSize() <= 0,
-                ErrorCode.PARAMS_ERROR, "分页参数不合法");
-        ThrowUtils.throwIf(limitPageSize && appQueryRequest.getPageSize() > AppConstant.USER_APP_MAX_PAGE_SIZE,
-                ErrorCode.PARAMS_ERROR, "每页最多查询 " + AppConstant.USER_APP_MAX_PAGE_SIZE + " 个应用");
+        ThrowUtils.throwIf(appQueryRequest.getPageNum() <= 0 || appQueryRequest.getPageSize() <= 0, ErrorCode.PARAMS_ERROR, "分页参数不合法");
+        ThrowUtils.throwIf(limitPageSize && appQueryRequest.getPageSize() > AppConstant.USER_APP_MAX_PAGE_SIZE, ErrorCode.PARAMS_ERROR, "每页最多查询 " + AppConstant.USER_APP_MAX_PAGE_SIZE + " 个应用");
     }
 
     /**
      * 查询并转换分页结果，复用批量用户查询，保留分页元数据。
      */
     private Page<AppVO> pageAppVO(AppQueryRequest appQueryRequest, QueryWrapper queryWrapper) {
-        Page<App> appPage = this.page(
-                Page.of(appQueryRequest.getPageNum(), appQueryRequest.getPageSize()), queryWrapper);
+        Page<App> appPage = this.page(Page.of(appQueryRequest.getPageNum(), appQueryRequest.getPageSize()), queryWrapper);
         Page<AppVO> appVOPage = new Page<>(appPage.getPageNumber(), appPage.getPageSize(), appPage.getTotalRow());
         appVOPage.setRecords(getAppVOList(appPage.getRecords()));
         return appVOPage;
@@ -427,15 +426,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
 
         // 收集所有创建者 id，并去重后一次性查询。
-        Set<Long> userIds = appList.stream()
-                .map(App::getUserId)
-                .filter(id -> id != null)
-                .collect(Collectors.toSet());
-        Map<Long, UserVO> userVOMap = userIds.isEmpty()
-                ? Collections.emptyMap()
-                : userService.listByIds(userIds).stream()
-                .collect(Collectors.toMap(User::getId, userService::getUserVO,
-                        (oldValue, newValue) -> oldValue));
+        Set<Long> userIds = appList.stream().map(App::getUserId).filter(id -> id != null).collect(Collectors.toSet());
+        Map<Long, UserVO> userVOMap = userIds.isEmpty() ? Collections.emptyMap() : userService.listByIds(userIds).stream().collect(Collectors.toMap(User::getId, userService::getUserVO, (oldValue, newValue) -> oldValue));
 
         return appList.stream().map(app -> {
             AppVO appVO = new AppVO();
@@ -456,16 +448,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
         return QueryWrapper.create()
                 // 精确匹配的字段
-                .eq("id", appQueryRequest.getId())
-                .eq("codeGenType", appQueryRequest.getCodeGenType())
-                .eq("deployKey", appQueryRequest.getDeployKey())
-                .eq("priority", appQueryRequest.getPriority())
-                .eq("userId", appQueryRequest.getUserId())
+                .eq("id", appQueryRequest.getId()).eq("codeGenType", appQueryRequest.getCodeGenType()).eq("deployKey", appQueryRequest.getDeployKey()).eq("priority", appQueryRequest.getPriority()).eq("userId", appQueryRequest.getUserId())
                 // 文本字段使用模糊匹配，便于后台检索应用。
-                .like("appName", appQueryRequest.getAppName())
-                .like("cover", appQueryRequest.getCover())
-                .like("initPrompt", appQueryRequest.getInitPrompt())
-                .orderBy(appQueryRequest.getSortField(), "ascend".equals(appQueryRequest.getSortOrder()));
+                .like("appName", appQueryRequest.getAppName()).like("cover", appQueryRequest.getCover()).like("initPrompt", appQueryRequest.getInitPrompt()).orderBy(appQueryRequest.getSortField(), "ascend".equals(appQueryRequest.getSortOrder()));
     }
 
     /**
@@ -480,12 +465,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
         }
 
-        return QueryWrapper.create()
-                .eq("priority", AppConstant.GOOD_APP_PRIORITY)
-                .like("appName", appQueryRequest.getAppName())
-                .orderBy(appQueryRequest.getSortField(), "ascend".equals(appQueryRequest.getSortOrder()));
+        return QueryWrapper.create().eq("priority", AppConstant.GOOD_APP_PRIORITY).like("appName", appQueryRequest.getAppName()).orderBy(appQueryRequest.getSortField(), "ascend".equals(appQueryRequest.getSortOrder()));
     }
-
 
 
 }

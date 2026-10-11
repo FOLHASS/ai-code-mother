@@ -6,6 +6,11 @@ export type ChatMessage = {
   content: string
   loading?: boolean
   error?: boolean
+  toolCalls?: {
+    id: string
+    name: string
+    status: 'running' | 'completed' | 'failed'
+  }[]
 }
 
 const compareIds = (left = '0', right = '0') => {

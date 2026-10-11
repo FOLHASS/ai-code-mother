@@ -6,13 +6,16 @@ import com.xy.aicodemother.ai.tools.ProjectBuildService;
 import com.xy.aicodemother.ai.tools.ProjectWorkspace;
 import com.xy.aicodemother.config.ProjectToolProperties;
 import com.xy.aicodemother.model.enums.CodeGenTypeEnum;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.service.TokenStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
-import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.lang.reflect.Proxy;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,7 +37,7 @@ class VueProjectGenerationTest {
                     }
                     assertEquals(3L, arguments[0]);
                     assertEquals("任务网站", arguments[1]);
-                    return Flux.just("准备生成", "生成完毕");
+                    return textTokenStream();
                 });
         factory = new StubFactory(aiService);
         buildService = new StubBuildService();
@@ -59,6 +62,29 @@ class VueProjectGenerationTest {
                 () -> facade.generateAndSaveCodeStream("任务网站", CodeGenTypeEnum.VUE_PROJECT, 3L)
                         .collectList().block(java.time.Duration.ofSeconds(5)));
         assertEquals("构建失败", error.getMessage());
+    }
+
+    private TokenStream textTokenStream() {
+        AtomicReference<Consumer<String>> partialHandler = new AtomicReference<>();
+        AtomicReference<Consumer<ChatResponse>> completeHandler = new AtomicReference<>();
+        return (TokenStream) Proxy.newProxyInstance(TokenStream.class.getClassLoader(),
+                new Class<?>[]{TokenStream.class}, (proxy, method, arguments) -> {
+                    if ("onPartialResponse".equals(method.getName())) {
+                        @SuppressWarnings("unchecked")
+                        Consumer<String> handler = (Consumer<String>) arguments[0];
+                        partialHandler.set(handler);
+                    } else if ("onCompleteResponse".equals(method.getName())) {
+                        @SuppressWarnings("unchecked")
+                        Consumer<ChatResponse> handler = (Consumer<ChatResponse>) arguments[0];
+                        completeHandler.set(handler);
+                    } else if ("start".equals(method.getName())) {
+                        partialHandler.get().accept("准备生成");
+                        partialHandler.get().accept("生成完毕");
+                        completeHandler.get().accept(null);
+                        return null;
+                    }
+                    return proxy;
+                });
     }
 
     private static class StubFactory extends AiCodeGeneratorServiceFactory {

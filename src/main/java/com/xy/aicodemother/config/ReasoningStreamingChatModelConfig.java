@@ -26,7 +26,7 @@ public class ReasoningStreamingChatModelConfig {
      */
     @Bean
     public StreamingChatModel reasoningStreamingChatModel() {
-        final String modelName = "qwen3.7-flash-2026-07-15";
+        final String modelName = "qwen3.7-flash";
         final int maxTokens = 64768;
         return OpenAiStreamingChatModel.builder()
                 // 明确使用 Spring HTTP 客户端，避免与 JDK 客户端的 SPI 自动发现冲突。
@@ -34,8 +34,8 @@ public class ReasoningStreamingChatModelConfig {
                 .apiKey(apiKey)
                 .baseUrl(baseUrl)
                 .modelName(modelName)
-                .logRequests(true)
-                .logResponses(true)
+                .logRequests(false)
+                .logResponses(false)
                 .timeout(Duration.ofSeconds(600))
                 .reasoningEffort("low")
                 .build();

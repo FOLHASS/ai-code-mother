@@ -13,7 +13,7 @@ import { useLoginUserStore } from '@/stores/loginUserStore.ts'
 import { formatDateTime, getDeployUrl, getPreviewUrl } from '@/utils/app.ts'
 import type { ChatMessage } from '@/utils/chatHistory.ts'
 import { mergeHistoryMessages, sortHistoryRecords } from '@/utils/chatHistory.ts'
-import { streamChatToGenCode } from '@/utils/chatStream.ts'
+import { streamChatToGenCode, type ChatStreamMessage } from '@/utils/chatStream.ts'
 
 const route = useRoute()
 const router = useRouter()
@@ -86,11 +86,41 @@ const scrollToBottom = async () => {
   if (messageList.value) messageList.value.scrollTop = messageList.value.scrollHeight
 }
 
-const appendStreamChunk = (assistantMessage: ChatMessage, chunk: string) => {
-  if (!chunk) return
+const appendStreamMessage = (assistantMessage: ChatMessage, chunk: ChatStreamMessage) => {
   const list = messageList.value
   const shouldScroll = !list || list.scrollHeight - list.scrollTop - list.clientHeight < 80
-  assistantMessage.content += chunk
+  if (chunk.type === 'ai_response') {
+    assistantMessage.content += chunk.content
+  } else {
+    const tools = (assistantMessage.toolCalls ??= [])
+    // 同一次工具调用通过 ID 更新状态；没有 ID 时匹配最近一次同名调用。
+    let tool = chunk.toolId
+      ? tools.find((item) => item.id === chunk.toolId)
+      : chunk.type === 'tool_executed'
+        ? [...tools].reverse().find((item) => item.name === (chunk.toolName || '工具') && item.status === 'running')
+        : undefined
+    if (!tool) {
+      tool = {
+        id: chunk.toolId || `tool-${tools.length}`,
+        name: chunk.toolName || '工具',
+        status: 'running',
+      }
+      tools.push(tool)
+    }
+    if (chunk.type === 'tool_executed') {
+      // 完成回调代表执行结束，仍需区分工具返回的 success=false。
+      let failed = false
+      try {
+        const result: unknown = JSON.parse(chunk.content || '')
+        failed = Boolean(
+          result && typeof result === 'object' && 'success' in result && result.success === false,
+        )
+      } catch {
+        // 普通文本工具结果也可表示一次完整的调用。
+      }
+      tool.status = failed ? 'failed' : 'completed'
+    }
+  }
   const index = messages.value.findIndex((item) => item.id === assistantMessage.id)
   if (index >= 0) {
     messages.value[index] = { ...assistantMessage }
@@ -294,7 +324,7 @@ const sendMessage = async (value = input.value, isInitial = false) => {
       controller.signal,
     )) {
       if (version !== appVersion) return
-      appendStreamChunk(assistantMessage, chunk)
+      appendStreamMessage(assistantMessage, chunk)
     }
     if (version !== appVersion) return
     assistantMessage.loading = false
@@ -304,6 +334,9 @@ const sendMessage = async (value = input.value, isInitial = false) => {
     if (version !== appVersion || controller.signal.aborted) return
     assistantMessage.loading = false
     assistantMessage.error = true
+    assistantMessage.toolCalls?.forEach((tool) => {
+      if (tool.status === 'running') tool.status = 'failed'
+    })
     const reason = error instanceof Error ? error.message : '生成失败，请稍后重试'
     assistantMessage.content = `${assistantMessage.content ? assistantMessage.content + '\n\n' : ''}[生成失败] ${reason}`
     message.error(reason)
@@ -475,6 +508,19 @@ onUnmounted(() => {
                   v-if="item.role === 'assistant' && item.loading && item.content"
                   class="streaming-cursor"
                 ></span>
+                <div v-if="item.toolCalls?.length" class="tool-calls" aria-live="polite">
+                  <div
+                    v-for="tool in item.toolCalls"
+                    :key="tool.id"
+                    :class="{ 'tool-call--failed': tool.status === 'failed' }"
+                    class="tool-call"
+                  >
+                    <span>{{ tool.name }}</span>
+                    <span>{{
+                      tool.status === 'running' ? '执行中…' : tool.status === 'failed' ? '执行失败' : '已完成'
+                    }}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </article>
@@ -938,6 +984,25 @@ onUnmounted(() => {
   color: #f2c27d;
 }
 .message-error {
+  color: #b6535d;
+  background: #fff1f1;
+}
+.tool-calls {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+}
+.tool-call {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 8px;
+  color: #328675;
+  font-size: 12px;
+  background: #eaf4f1;
+  border-radius: 6px;
+}
+.tool-call--failed {
   color: #b6535d;
   background: #fff1f1;
 }

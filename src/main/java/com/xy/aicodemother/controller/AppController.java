@@ -1,5 +1,6 @@
 package com.xy.aicodemother.controller;
 
+import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.xy.aicodemother.annotation.AuthCheck;
 import com.xy.aicodemother.common.BaseResponse;
@@ -27,6 +28,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -58,7 +62,19 @@ public class AppController {
                                                @RequestParam String message,
                                                HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
-        return appService.chatToGenCode(appId, message, loginUser);
+
+        // 对流当中的每一块数据进行包装， 防止数据传输过程当中的空行丢失，影响前端渲染
+        // 实现的两种方式：
+        // 1. 使用json对象进行包装传输 2. 对字符串进行哈希加密，然后前端解密
+        return appService.chatToGenCode(appId, message, loginUser)
+                .map(chunk -> {
+                    Map<String, String> wrapper = Map.of("d", chunk);
+                    String jsonStr = JSONUtil.toJsonStr(wrapper);
+                    return ServerSentEvent.<String>builder().data(jsonStr).build();
+                })
+                .concatWith(Mono.just(
+                        ServerSentEvent.<String>builder().event("done").data("").build()
+                ));
     }
 
 

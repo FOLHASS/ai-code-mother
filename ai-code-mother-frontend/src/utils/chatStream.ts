@@ -1,5 +1,16 @@
 import { API_BASE_URL } from '@/request'
 
+/** AI 正文和工具执行状态分开传递，工具参数及结果不拼接进 AI 正文。 */
+export type ChatStreamMessage =
+  | { type: 'ai_response'; content: string }
+  | {
+      type: 'tool_request' | 'tool_executed'
+      content?: string
+      toolId?: string
+      toolName?: string
+      toolArguments?: string
+    }
+
 /** 原生读取 SSE，独立于自动生成的 API 文件，避免接口生成时被覆盖。 */
 export async function* streamChatToGenCode(params: API.chatToGenCodeParams, signal?: AbortSignal) {
   const query = new URLSearchParams({ appId: params.appId, message: params.message })
@@ -13,12 +24,12 @@ export async function* streamChatToGenCode(params: API.chatToGenCodeParams, sign
   if (response.headers.get('content-type')?.includes('application/json')) {
     const result = (await response.json()) as API.BaseResponseString
     if (result.code !== 0 || !result.data) throw new Error(result.message || '代码生成失败')
-    yield result.data
+    yield { type: 'ai_response', content: result.data } satisfies ChatStreamMessage
     return
   }
   if (!response.body) throw new Error('代码生成响应为空')
 
-  const parseEvent = (event: string) => {
+  const parseEvent = (event: string): ChatStreamMessage | { done: true } | null => {
     const lines = event.split(/\r?\n/)
     const type = lines.find((line) => line.startsWith('event:'))?.slice(6).trim()
     const data = lines.filter((line) => line.startsWith('data:'))
@@ -31,13 +42,30 @@ export async function* streamChatToGenCode(params: API.chatToGenCodeParams, sign
       throw new Error(detail || '代码生成失败')
     }
     if (!data) return null
-    if (typeof payload === 'string') return { content: payload }
+    if (typeof payload === 'string') return { type: 'ai_response', content: payload }
     if (payload && typeof payload === 'object') {
-      const detail = payload as { d?: string; code?: number; message?: string }
+      const detail = payload as {
+        type?: string; content?: string; toolId?: string; toolName?: string; toolArguments?: string
+        d?: string; code?: number; message?: string
+      }
       if (detail.code !== undefined && detail.code !== 0) throw new Error(detail.message || '代码生成失败')
-      if (typeof detail.d === 'string') return { content: detail.d }
+      if (detail.type === 'ai_response') {
+        return typeof detail.content === 'string' ? { type: detail.type, content: detail.content } : null
+      }
+      if (detail.type === 'tool_request' || detail.type === 'tool_executed') {
+        return {
+          type: detail.type,
+          ...(typeof detail.content === 'string' ? { content: detail.content } : {}),
+          ...(typeof detail.toolId === 'string' ? { toolId: detail.toolId } : {}),
+          ...(typeof detail.toolName === 'string' ? { toolName: detail.toolName } : {}),
+          ...(typeof detail.toolArguments === 'string' ? { toolArguments: detail.toolArguments } : {}),
+        }
+      }
+      // 保留旧版文本流兼容，未知结构事件不作为 AI 文本显示。
+      if (detail.type) return null
+      if (typeof detail.d === 'string') return { type: 'ai_response', content: detail.d }
     }
-    return { content: data }
+    return { type: 'ai_response', content: data }
   }
 
   const reader = response.body.getReader()
@@ -51,14 +79,14 @@ export async function* streamChatToGenCode(params: API.chatToGenCodeParams, sign
       while (separator) {
         const event = parseEvent(buffer.slice(0, separator.index))
         buffer = buffer.slice(separator.index + separator[0].length)
-        if (event?.done) return
-        if (event?.content) yield event.content
+        if (event && 'done' in event) return
+        if (event) yield event
         separator = /\r?\n\r?\n/.exec(buffer)
       }
       if (done) {
         const event = parseEvent(buffer)
-        if (event?.done) return
-        if (event?.content) yield event.content
+        if (event && 'done' in event) return
+        if (event) yield event
         throw new Error('生成连接提前结束，请稍后重试')
       }
     }

@@ -42,10 +42,10 @@ public interface AiCodeGeneratorService {
 
 
     /**
-     * 生成Vue代码 -- 流式输出
+     * 生成 Vue 代码，TokenStream 用于获取文字和工具调用前后的回调。
      * @param userMessage
      * @return
      */
     @SystemMessage(fromResource = "prompt/codegen-vue-project-system-prompt.txt")
-    Flux<String>  generateVueProjectCodeStream(@MemoryId Long appId, @UserMessage String userMessage);
+    TokenStream generateVueProjectCodeStream(@MemoryId Long appId, @UserMessage String userMessage);
 }
