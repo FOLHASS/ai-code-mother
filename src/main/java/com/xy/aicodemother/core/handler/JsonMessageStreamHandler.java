@@ -88,6 +88,10 @@ public class JsonMessageStreamHandler {
         StreamMessage streamMessage = JSONUtil.toBean(chunk, StreamMessage.class);
         StreamMessageTypeEnum typeEnum = StreamMessageTypeEnum.getEnumByValue(streamMessage.getType());
         switch (typeEnum) {
+            case AI_THINKING -> {
+                // 思考片段不属于最终回复，不能写入对话历史或生成代码。
+                return "";
+            }
             case AI_RESPONSE -> {
                 AiResponseMessage aiMessage = JSONUtil.toBean(chunk, AiResponseMessage.class);
                 String data = aiMessage.getData();

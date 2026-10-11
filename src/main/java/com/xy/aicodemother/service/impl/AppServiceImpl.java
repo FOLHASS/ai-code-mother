@@ -3,15 +3,11 @@ package com.xy.aicodemother.service.impl;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
-import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.xy.aicodemother.ai.AiCodeGenTypeRoutingService;
-import com.xy.aicodemother.ai.AiCodeGenTypeRoutingServiceFactory;
-import com.xy.aicodemother.ai.tools.model.ProjectBuildResult;
 import com.xy.aicodemother.constant.AppConstant;
-import com.xy.aicodemother.ai.model.AiResponseMessage;
 import com.xy.aicodemother.ai.tools.ProjectBuildService;
 import com.xy.aicodemother.core.AiCodeGeneratorFacade;
 import com.xy.aicodemother.core.builder.VueProjectBuilder;
@@ -32,17 +28,16 @@ import com.xy.aicodemother.model.vo.AppVO;
 import com.xy.aicodemother.model.vo.UserVO;
 import com.xy.aicodemother.service.AppService;
 import com.xy.aicodemother.service.ChatHistoryService;
+import com.xy.aicodemother.service.ScreenshotService;
 import com.xy.aicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
-import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.io.File;
 import java.time.LocalDateTime;
@@ -82,6 +77,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Resource
     private ProjectBuildService projectBuildService;
+    @Resource
+    private ScreenshotService screenshotService;
 
 
     @Override
@@ -152,7 +149,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
 
         // 如果是 Vue 项目，则需要构建
-        if(codeGenType.equals(CodeGenTypeEnum.VUE_PROJECT.getValue())) {
+        if (codeGenType.equals(CodeGenTypeEnum.VUE_PROJECT.getValue())) {
             // 1. 执行项目的构建
             boolean buildSuccess = vueProjectBuilder.buildProject(sourceDirPath);
             ThrowUtils.throwIf(!buildSuccess, ErrorCode.SYSTEM_ERROR, "项目构建失败");
@@ -181,7 +178,20 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "应用部署失败");
         }
         log.info("应用部署成功，appId={}, deployKey={}", appId, deployKey);
-        return String.format("%s/%s", AppConstant.CODE_DEPLOY_HOST, deployKey);
+        String deployUrl = String.format("%s/%s", AppConstant.CODE_DEPLOY_HOST, deployKey);
+        genScreenShotAsync(appId, deployUrl);
+        return deployUrl;
+    }
+
+    @Override
+    public void genScreenShotAsync(Long appId, String appUrl) {
+        String screenshootUrl = screenshotService.generateAndUploadScreenshot(appUrl);
+        log.info("截图生成成功，appId={}, screenshotUrl={}", appId, screenshootUrl);
+        App updateApp = new App();
+        updateApp.setId(appId);
+        updateApp.setCover(screenshootUrl);
+        boolean result = updateById(updateApp);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "应用截图更新失败");
     }
 
     /**
@@ -192,6 +202,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
      * 后续代码生成和保存流程不会因为类型为空而失败。</p>
      */
     @Override
+
     public long createApp(AppAddRequest appAddRequest, User loginUser) {
         ThrowUtils.throwIf(appAddRequest == null, ErrorCode.PARAMS_ERROR, "请求参数为空");
         Long userId = getLoginUserId(loginUser);

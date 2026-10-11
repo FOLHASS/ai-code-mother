@@ -109,7 +109,11 @@ public class AiCodeGeneratorFacade {
             tokenStream.onPartialResponse(content -> {
                         AiResponseMessage aiResponseMessage = new AiResponseMessage(content);
                         sink.next(JSONUtil.toJsonStr(aiResponseMessage));
-                    }).onPartialToolCall(before -> {
+                    }).onPartialThinking(partialThinking -> {
+                        AiThinkingMessage aiThinkingMessage = new AiThinkingMessage(partialThinking.text());
+                        sink.next(JSONUtil.toJsonStr(aiThinkingMessage));
+                    })
+                    .onPartialToolCall(before -> {
                         ToolRequestMessage toolRequestMessage = new ToolRequestMessage(before.id(), before.name(), before.partialArguments());
                         sink.next(JSONUtil.toJsonStr(toolRequestMessage));
                     }).onToolExecuted(execution -> {

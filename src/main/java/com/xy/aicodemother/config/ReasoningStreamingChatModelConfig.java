@@ -38,6 +38,7 @@ public class ReasoningStreamingChatModelConfig {
                 .logResponses(false)
                 .timeout(Duration.ofSeconds(600))
                 .reasoningEffort("low")
+                .returnThinking(true)
                 .build();
     }
 
