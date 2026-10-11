@@ -6,6 +6,7 @@ import com.xy.aicodemother.ai.model.ToolExecutedMessage;
 import com.xy.aicodemother.ai.tools.ProjectFileTools;
 import com.xy.aicodemother.ai.tools.ProjectWorkspace;
 import com.xy.aicodemother.config.ProjectToolProperties;
+import com.xy.aicodemother.core.builder.VueProjectBuilder;
 import com.xy.aicodemother.model.entity.User;
 import com.xy.aicodemother.model.enums.ChatHistoryMessageTypeEnum;
 import com.xy.aicodemother.service.ChatHistoryService;
@@ -13,6 +14,7 @@ import dev.langchain4j.internal.Json;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Flux;
 
 import java.lang.reflect.Proxy;
@@ -234,7 +236,14 @@ class JsonMessageStreamHandlerTest {
                 });
         User user = new User();
         user.setId(USER_ID);
-        List<String> output = new JsonMessageStreamHandler().handle(
+        JsonMessageStreamHandler handler = new JsonMessageStreamHandler();
+        ReflectionTestUtils.setField(handler, "vueProjectBuilder", new VueProjectBuilder() {
+            @Override
+            public boolean buildProject(String projectPath) {
+                return true;
+            }
+        });
+        List<String> output = handler.handle(
                         Flux.just(JSONUtil.toJsonStr(message)), historyService, APP_ID, user)
                 .collectList().block(Duration.ofSeconds(5));
         assertNotNull(output);

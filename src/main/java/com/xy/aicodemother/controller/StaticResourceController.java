@@ -35,8 +35,8 @@ public class StaticResourceController {
     /**
      * 提供生成网站的静态预览资源，支持目录重定向。
      *
-     * <p>Vue 工程只提供 publish_preview 发布的 dist 内容；HTML 和原生多文件模式
-     * 保留原来的生成目录。此处的路径标识为 codeGenType_appId，与部署网站的 deployKey 不同。</p>
+     * <p>Vue 的 /dist/ 路径只提供工程中的构建产物，根路径兼容 publish_preview 发布的产物。
+     * HTML 和原生多文件模式保留生成目录。路径标识为 codeGenType_appId，与部署网站的 deployKey 不同。</p>
      */
     @GetMapping("/{deployKey}/**")
     public ResponseEntity<Resource> serveStaticResource(
@@ -53,20 +53,31 @@ public class StaticResourceController {
                 return ResponseEntity.badRequest().build();
             }
             resourcePath = resourcePath.substring(("/static/" + deployKey).length());
+            boolean vueProject = deployKey.startsWith("vue_project_");
+            boolean projectDist = vueProject
+                    && (resourcePath.equals("/dist") || resourcePath.startsWith("/dist/"));
             // 如果是目录访问（不带斜杠），重定向到带斜杠的URL
-            if (resourcePath.isEmpty()) {
+            if (resourcePath.isEmpty() || (projectDist && resourcePath.equals("/dist"))) {
                 HttpHeaders headers = new HttpHeaders();
                 headers.add("Location", request.getRequestURI() + "/");
                 return new ResponseEntity<>(headers, HttpStatus.MOVED_PERMANENTLY);
             }
-            // 默认返回 index.html
+            Path root = Path.of(vueProject
+                    ? (projectDist ? projectToolProperties.getWorkspaceRoot() : projectToolProperties.getPreviewRoot())
+                    : AppConstant.CODE_OUTPUT_ROOT_DIR)
+                    .toAbsolutePath().normalize();
+            Path projectRoot = root.resolve(deployKey).normalize();
+            if (Files.isSymbolicLink(projectRoot)) {
+                return ResponseEntity.badRequest().build();
+            }
+            Path appRoot = projectDist ? projectRoot.resolve("dist") : projectRoot;
+            if (projectDist) {
+                resourcePath = resourcePath.substring("/dist".length());
+            }
+            // / 和 /dist/ 均默认返回 index.html，资源请求仍保留相对路径。
             if (resourcePath.equals("/")) {
                 resourcePath = "/index.html";
             }
-            Path root = Path.of(deployKey.startsWith("vue_project_")
-                    ? projectToolProperties.getPreviewRoot() : AppConstant.CODE_OUTPUT_ROOT_DIR)
-                    .toAbsolutePath().normalize();
-            Path appRoot = root.resolve(deployKey).normalize();
             Path file = appRoot.resolve(resourcePath.substring(1)).normalize();
             // 先校验文本路径，再校验真实路径，防止 ../ 和符号链接绕过应用隔离。
             if (!file.startsWith(appRoot) || Files.isSymbolicLink(appRoot)) {
@@ -82,6 +93,7 @@ public class StaticResourceController {
             Resource resource = new FileSystemResource(file);
             return ResponseEntity.ok()
                     .header("Content-Type", getContentTypeWithCharset(file.toString()))
+                    .header(HttpHeaders.CACHE_CONTROL, "no-cache")
                     .header("X-Content-Type-Options", "nosniff")
                     .body(resource);
         } catch (InvalidPathException e) {

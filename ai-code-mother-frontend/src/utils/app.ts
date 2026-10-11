@@ -8,7 +8,8 @@ export const getDeployUrl = (app: Pick<API.AppVO, 'deployKey'>) => {
 
 export const getPreviewUrl = (app: Pick<API.AppVO, 'id' | 'codeGenType'>, cacheBust = false) => {
   if (!app.id || !app.codeGenType) return ''
-  const url = `${API_BASE_URL}/static/${app.codeGenType}_${app.id}/`
+  const previewPath = app.codeGenType === 'vue_project' ? 'dist/' : ''
+  const url = `${API_BASE_URL}/static/${app.codeGenType}_${app.id}/${previewPath}`
   return cacheBust ? `${url}?t=${Date.now()}` : url
 }
 

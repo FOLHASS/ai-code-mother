@@ -25,6 +25,7 @@ const isLoadingApp = ref(true)
 const isStreaming = ref(false)
 const isDeploying = ref(false)
 const previewUrl = ref('')
+const previewError = ref('')
 const deployedUrl = ref('')
 const messageList = ref<HTMLElement | null>(null)
 const hasSentInitialPrompt = ref(false)
@@ -37,6 +38,7 @@ const historyTotal = ref(0)
 const historyCursor = ref<{ lastCreateTime: string; lastId: string } | null>(null)
 let messageId = 0
 let appVersion = 0
+let previewCheckId = 0
 let generationController: AbortController | null = null
 
 const escapeHtml = (value: string) =>
@@ -149,10 +151,35 @@ const copyCode = async (event: MouseEvent) => {
   }
 }
 
-const showPreview = (cacheBust = false) => {
+const showPreview = async (cacheBust = false) => {
   if (!app.value) return
-  previewUrl.value = getPreviewUrl(app.value, cacheBust)
-  hasGeneratedWebsite.value = Boolean(previewUrl.value)
+  const version = appVersion
+  const url = getPreviewUrl(app.value, cacheBust)
+  if (!url) return
+  const checkId = ++previewCheckId
+  previewError.value = ''
+  try {
+    // 对话历史条数不能代表构建成功；确认静态页面存在后再显示 iframe。
+    const response = await fetch(url, { method: 'HEAD', credentials: 'include', cache: 'no-store' })
+    if (version !== appVersion || checkId !== previewCheckId) return
+    if (!response.ok) {
+      throw new Error(
+        response.status === 404
+          ? '预览文件尚未生成，请完成代码生成后重试'
+          : `网站预览加载失败（${response.status}），请刷新重试`,
+      )
+    }
+    previewUrl.value = url
+    hasGeneratedWebsite.value = true
+  } catch (error) {
+    if (version !== appVersion || checkId !== previewCheckId) return
+    previewUrl.value = ''
+    hasGeneratedWebsite.value = false
+    previewError.value =
+      error instanceof Error && !(error instanceof TypeError)
+        ? error.message
+        : '网站预览加载失败，请确认后端服务可用后重试'
+  }
 }
 
 const loadHistory = async (loadMore = false, version = appVersion) => {
@@ -192,7 +219,7 @@ const loadHistory = async (loadMore = false, version = appVersion) => {
     if (!loadMore) {
       historyLoaded.value = true
       historyTotal.value = remaining
-      if (remaining >= 2 || records.length >= 2) showPreview()
+      if (remaining >= 2 || records.length >= 2) await showPreview()
       await scrollToBottom()
     } else {
       // 在顶部插入旧消息后补偿高度，保持用户正在阅读的位置。
@@ -244,6 +271,7 @@ const loadApp = async () => {
   messages.value = []
   input.value = ''
   previewUrl.value = ''
+  previewError.value = ''
   deployedUrl.value = ''
   hasGeneratedWebsite.value = false
   hasSentInitialPrompt.value = false
@@ -282,7 +310,7 @@ const loadApp = async () => {
     app.value = response.data.data
     deployedUrl.value = getDeployUrl(app.value)
     if (canReadHistory.value) await initializeHistory(version)
-    else showPreview()
+    else await showPreview()
   } catch {
     if (version !== appVersion) return
     message.error('应用加载失败，请稍后重试')
@@ -329,7 +357,7 @@ const sendMessage = async (value = input.value, isInitial = false) => {
     if (version !== appVersion) return
     assistantMessage.loading = false
     assistantMessage.createTime = new Date().toISOString()
-    showPreview(true)
+    await showPreview(true)
   } catch (error) {
     if (version !== appVersion || controller.signal.aborted) return
     assistantMessage.loading = false
@@ -580,7 +608,15 @@ onUnmounted(() => {
           <div class="browser-toolbar">
             <span class="browser-dots"><i></i><i></i><i></i></span>
             <div class="browser-address">localhost / {{ app?.codeGenType || 'preview' }}</div>
-            <span class="browser-refresh">↻</span>
+            <button
+              :disabled="isStreaming || !app"
+              aria-label="刷新网站预览"
+              class="browser-refresh"
+              type="button"
+              @click="showPreview(true)"
+            >
+              ↻
+            </button>
           </div>
           <div class="browser-content">
             <iframe
@@ -591,12 +627,19 @@ onUnmounted(() => {
             ></iframe>
             <div v-else class="preview-empty">
               <span class="preview-loader"><i></i><i></i><i></i></span
-              ><strong>{{ isStreaming ? '正在解析生成的网站' : '网站预览会出现在这里' }}</strong>
+              ><strong>{{
+                previewError
+                  ? '网站预览暂不可用'
+                  : isStreaming
+                    ? '正在解析生成的网站'
+                    : '网站预览会出现在这里'
+              }}</strong>
               <p>
                 {{
-                  isStreaming
+                  previewError ||
+                  (isStreaming
                     ? '代码流式输出完成后，预览会自动加载'
-                    : '等待左侧 AI 完成代码生成后自动展示'
+                    : '等待左侧 AI 完成代码生成后自动展示')
                 }}
               </p>
             </div>
@@ -1143,6 +1186,13 @@ onUnmounted(() => {
 .browser-refresh {
   color: #91a1a7;
   font-size: 16px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.browser-refresh:disabled {
+  cursor: not-allowed;
 }
 .browser-content {
   position: relative;

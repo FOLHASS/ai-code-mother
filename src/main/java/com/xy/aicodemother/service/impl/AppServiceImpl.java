@@ -9,10 +9,12 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.xy.aicodemother.ai.AiCodeGenTypeRoutingService;
 import com.xy.aicodemother.ai.AiCodeGenTypeRoutingServiceFactory;
+import com.xy.aicodemother.ai.tools.model.ProjectBuildResult;
 import com.xy.aicodemother.constant.AppConstant;
 import com.xy.aicodemother.ai.model.AiResponseMessage;
 import com.xy.aicodemother.ai.tools.ProjectBuildService;
 import com.xy.aicodemother.core.AiCodeGeneratorFacade;
+import com.xy.aicodemother.core.builder.VueProjectBuilder;
 import com.xy.aicodemother.core.handler.StreamHandlerExecutor;
 import com.xy.aicodemother.exception.BusinessException;
 import com.xy.aicodemother.exception.ErrorCode;
@@ -75,6 +77,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private StreamHandlerExecutor streamHandlerExecutor;
     @Resource
     private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
 
     @Resource
     private ProjectBuildService projectBuildService;
@@ -141,22 +145,26 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         String sourceDirName = codeGenType + "_" + appId;
         String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
 
-        // todo 实现vue-project逻辑的部署
-        /**
-         * 1. 现npm i
-         * 2. npm run build （LLM保证一定能build通过）
-         * 3. 移动构建生成的文件到deploy目录下
-         */
-
-        // todo 下面的逻辑都得重新改
-        // 工程应用部署成功发布的 dist，避免将源码和 node_modules 复制到公开站点。
         // 原生 HTML 和多文件应用仍使用现有生成目录，部署域名及 deployKey 规则保持一致。
-        File sourceFile = CodeGenTypeEnum.VUE_PROJECT.getValue().equals(codeGenType) ? projectBuildService.getPublishedDirectory(appId).toFile() : new File(sourceDirPath);
+        File sourceFile = new File(sourceDirPath);
         if (!sourceFile.exists() || !sourceFile.isDirectory()) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "部署目录不存在");
         }
 
+        // 如果是 Vue 项目，则需要构建
+        if(codeGenType.equals(CodeGenTypeEnum.VUE_PROJECT.getValue())) {
+            // 1. 执行项目的构建
+            boolean buildSuccess = vueProjectBuilder.buildProject(sourceDirPath);
+            ThrowUtils.throwIf(!buildSuccess, ErrorCode.SYSTEM_ERROR, "项目构建失败");
+
+            File distDir = new File(sourceFile, "dist");
+            ThrowUtils.throwIf(!distDir.exists() || !distDir.isDirectory(), ErrorCode.SYSTEM_ERROR, "项目构建失败，dist 目录不存在");
+            log.info("项目构建成功，appId={}", appId);
+            sourceFile = distDir;
+        }
+
         // 复制文件到部署目录下面
+        // 特别注意前端在实现预览的时候 要加上dist目录
         String deployDirPath = AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + deployKey;
         try {
             FileUtil.copyContent(sourceFile, new File(deployDirPath), true);
@@ -174,7 +182,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         log.info("应用部署成功，appId={}, deployKey={}", appId, deployKey);
         return String.format("%s/%s", AppConstant.CODE_DEPLOY_HOST, deployKey);
-
     }
 
     /**

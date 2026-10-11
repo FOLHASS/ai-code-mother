@@ -6,12 +6,19 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.xy.aicodemother.ai.model.*;
+import com.xy.aicodemother.constant.AppConstant;
+import com.xy.aicodemother.core.builder.VueProjectBuilder;
+import com.xy.aicodemother.exception.ErrorCode;
+import com.xy.aicodemother.exception.ThrowUtils;
 import com.xy.aicodemother.model.entity.User;
 import com.xy.aicodemother.model.enums.ChatHistoryMessageTypeEnum;
 import com.xy.aicodemother.service.ChatHistoryService;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -24,6 +31,9 @@ import java.util.regex.Pattern;
 @Slf4j
 @Component
 public class JsonMessageStreamHandler {
+
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
 
     private static final int MAX_DISPLAY_ITEMS = 20;
     private static final int MAX_CODE_CHARS = 8000;
@@ -52,10 +62,16 @@ public class JsonMessageStreamHandler {
                     return handleJsonMessageChunk(chunk, chatHistoryStringBuilder, seenToolIds);
                 })
                 .filter(StrUtil::isNotEmpty) // 过滤空字串
+                // Vue 源码生成结束后还需构建，dist 可用后才能结束 SSE 并让前端刷新预览。
                 .doOnComplete(() -> {
                     // 流式响应完成后，添加 AI 消息到对话历史
                     String aiResponse = chatHistoryStringBuilder.toString();
                     chatHistoryService.addChatHistory(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
+
+                    boolean built = vueProjectBuilder.buildProject(
+                            AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId);
+                    ThrowUtils.throwIf(!built, ErrorCode.OPERATION_ERROR, "Vue 项目构建失败，暂时无法预览，请重试");
+
                 })
                 .doOnError(error -> {
                     // 如果AI回复失败，也要记录错误消息

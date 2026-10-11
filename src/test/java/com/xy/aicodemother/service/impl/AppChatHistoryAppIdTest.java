@@ -3,6 +3,7 @@ package com.xy.aicodemother.service.impl;
 import cn.hutool.json.JSONUtil;
 import com.xy.aicodemother.ai.model.AiResponseMessage;
 import com.xy.aicodemother.core.AiCodeGeneratorFacade;
+import com.xy.aicodemother.core.builder.VueProjectBuilder;
 import com.xy.aicodemother.core.handler.JsonMessageStreamHandler;
 import com.xy.aicodemother.core.handler.StreamHandlerExecutor;
 import com.xy.aicodemother.exception.BusinessException;
@@ -106,7 +107,14 @@ class AppChatHistoryAppIdTest {
             }
         };
         StreamHandlerExecutor executor = new StreamHandlerExecutor();
-        ReflectionTestUtils.setField(executor, "jsonMessageStreamHandler", new JsonMessageStreamHandler());
+        JsonMessageStreamHandler handler = new JsonMessageStreamHandler();
+        ReflectionTestUtils.setField(handler, "vueProjectBuilder", new VueProjectBuilder() {
+            @Override
+            public boolean buildProject(String projectPath) {
+                return true;
+            }
+        });
+        ReflectionTestUtils.setField(executor, "jsonMessageStreamHandler", handler);
         ReflectionTestUtils.setField(service, "streamHandlerExecutor", executor);
         ReflectionTestUtils.setField(service, "aiCodeGeneratorFacade", facade);
         ReflectionTestUtils.setField(service, "chatHistoryService", historyService);

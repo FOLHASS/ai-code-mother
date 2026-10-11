@@ -7,6 +7,7 @@ import com.xy.aicodemother.common.BaseResponse;
 import com.xy.aicodemother.common.DeleteRequest;
 import com.xy.aicodemother.common.ResultUtils;
 import com.xy.aicodemother.constant.UserConstant;
+import com.xy.aicodemother.exception.BusinessException;
 import com.xy.aicodemother.exception.ErrorCode;
 import com.xy.aicodemother.exception.ThrowUtils;
 import com.xy.aicodemother.model.dto.app.AppAddRequest;
@@ -19,6 +20,7 @@ import com.xy.aicodemother.service.AppService;
 import com.xy.aicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,6 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @RestController
 @RequestMapping("/app")
+@Slf4j
 public class AppController {
 
     /**
@@ -74,7 +77,14 @@ public class AppController {
                 })
                 .concatWith(Mono.just(
                         ServerSentEvent.<String>builder().event("done").data("").build()
-                ));
+                ))
+                .onErrorResume(error -> {
+                    log.error("应用生成失败，appId={}", appId, error);
+                    String errorMessage = error instanceof BusinessException && error.getMessage() != null
+                            ? error.getMessage() : "代码生成失败，请稍后重试";
+                    return Mono.just(ServerSentEvent.<String>builder().event("error")
+                            .data(JSONUtil.toJsonStr(Map.of("message", errorMessage))).build());
+                });
     }
 
 
