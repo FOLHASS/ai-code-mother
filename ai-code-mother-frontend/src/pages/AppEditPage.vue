@@ -8,6 +8,7 @@ import AppCover from '@/components/AppCover.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useLoginUserStore } from '@/stores/loginUserStore.ts'
 import { formatDate } from '@/utils/app.ts'
+import { asApiLongId } from '@/utils/id.ts'
 
 const route = useRoute()
 const router = useRouter()
@@ -29,8 +30,8 @@ const loadApp = async () => {
   isLoading.value = true
   try {
     const response = isAdmin.value
-      ? await adminGetAppVoById({ id: appId.value })
-      : await getAppVoById({ id: appId.value })
+      ? await adminGetAppVoById({ id: asApiLongId(appId.value) })
+      : await getAppVoById({ id: asApiLongId(appId.value) })
     if (response.data.code !== 0 || !response.data.data) {
       message.error(response.data.message || '应用不存在或无权编辑')
       await router.replace('/')

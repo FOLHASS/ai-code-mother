@@ -8,6 +8,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import PageStat from '@/components/PageStat.vue'
 import { useLoginUserStore } from '@/stores/loginUserStore.ts'
 import { formatDateTime } from '@/utils/app.ts'
+import { asApiLongId } from '@/utils/id.ts'
 
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
@@ -19,10 +20,10 @@ const total = ref(0)
 const histories = ref<API.ChatHistoryVO[]>([])
 const selectedHistory = ref<API.ChatHistoryVO | null>(null)
 const showDetailsModal = ref(false)
-const searchForm = reactive<API.ChatHistoryQueryRequest>({
-  id: undefined,
-  appId: undefined,
-  userId: undefined,
+const searchForm = reactive({
+  id: '',
+  appId: '',
+  userId: '',
   messageType: '',
   message: '',
 })
@@ -43,9 +44,9 @@ const loadHistories = async () => {
     const response = await adminListChatHistoryByPage({
       pageNum: currentPage.value,
       pageSize,
-      id: searchForm.id?.trim() || undefined,
-      appId: searchForm.appId?.trim() || undefined,
-      userId: searchForm.userId?.trim() || undefined,
+      id: searchForm.id.trim() ? asApiLongId(searchForm.id.trim()) : undefined,
+      appId: searchForm.appId.trim() ? asApiLongId(searchForm.appId.trim()) : undefined,
+      userId: searchForm.userId.trim() ? asApiLongId(searchForm.userId.trim()) : undefined,
       messageType: searchForm.messageType || undefined,
       message: searchForm.message?.trim() || undefined,
       sortField: 'createTime',
@@ -71,7 +72,7 @@ const search = async () => {
 }
 
 const reset = async () => {
-  Object.assign(searchForm, { id: undefined, appId: undefined, userId: undefined, messageType: '', message: '' })
+  Object.assign(searchForm, { id: '', appId: '', userId: '', messageType: '', message: '' })
   await search()
 }
 

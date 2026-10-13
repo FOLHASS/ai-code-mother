@@ -6,6 +6,7 @@ import com.xy.aicodemother.annotation.AuthCheck;
 import com.xy.aicodemother.common.BaseResponse;
 import com.xy.aicodemother.common.DeleteRequest;
 import com.xy.aicodemother.common.ResultUtils;
+import com.xy.aicodemother.constant.AppConstant;
 import com.xy.aicodemother.constant.UserConstant;
 import com.xy.aicodemother.exception.BusinessException;
 import com.xy.aicodemother.exception.ErrorCode;
@@ -14,24 +15,26 @@ import com.xy.aicodemother.model.dto.app.AppAddRequest;
 import com.xy.aicodemother.model.dto.app.AppAdminUpdateRequest;
 import com.xy.aicodemother.model.dto.app.AppQueryRequest;
 import com.xy.aicodemother.model.dto.app.AppUpdateRequest;
+import com.xy.aicodemother.model.entity.App;
 import com.xy.aicodemother.model.entity.User;
+import com.xy.aicodemother.model.enums.CodeGenTypeEnum;
 import com.xy.aicodemother.model.vo.AppVO;
 import com.xy.aicodemother.service.AppService;
+import com.xy.aicodemother.service.DownloadService;
 import com.xy.aicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.ibatis.javassist.compiler.CodeGen;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.File;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -58,6 +61,10 @@ public class AppController {
      */
     @Resource
     private UserService userService;
+
+    @Autowired
+    @Resource
+    private DownloadService downloadService;
 
 
     @GetMapping(value = "/chat/gen/code", produces = "text/event-stream")
@@ -95,6 +102,23 @@ public class AppController {
         User loginUser = userService.getLoginUser(request);
         return ResultUtils.success(appService.deployApp(appId, loginUser));
     }
+
+
+    @GetMapping("/download/{appId}")   // 请求头是为了拿到用户信息， 响应是为了封装下载请求
+    public void downloadAppCode(@PathVariable Long appId, HttpServletRequest request, HttpServletResponse response) {
+        // 1. 校验参数
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 id 不合法");
+        // 2. 校验应用信息
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        // 3. 校验权限： 只有拥有者才能下载自己的代码
+        User loginUser = userService.getLoginUser(request);
+        ThrowUtils.throwIf(!app.getUserId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权限访问");
+        // 4. 下载代码
+        String rootPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator +  app.getCodeGenType()  + "_" + app.getId();
+        downloadService.downloadCodeAsZip(rootPath, app.getAppName(), response);
+    }
+
 
     /**
      * 用户创建应用。

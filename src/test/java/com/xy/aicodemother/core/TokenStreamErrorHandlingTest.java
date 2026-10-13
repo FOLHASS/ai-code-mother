@@ -5,6 +5,7 @@ import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.PartialThinking;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.IllegalConfigurationException;
@@ -39,6 +40,21 @@ class TokenStreamErrorHandlingTest {
         assertTrue(result.stream().allMatch(message ->
                 "ai_response".equals(JSONUtil.parseObj(message).getStr("type"))));
         assertNotNull(model.handler);
+    }
+
+    @Test
+    void streamsThinkingSeparatelyFromAiResponse() {
+        StubStreamingModel model = new StubStreamingModel(true, true);
+
+        List<String> result = AiCodeGeneratorFacade.toFlux(createStream(model))
+                .collectList().block(Duration.ofSeconds(5));
+
+        assertNotNull(result);
+        assertEquals(3, result.size());
+        assertEquals("ai_thinking", JSONUtil.parseObj(result.getFirst()).getStr("type"));
+        assertEquals("先规划工程", JSONUtil.parseObj(result.getFirst()).getStr("data"));
+        assertEquals("ai_response", JSONUtil.parseObj(result.get(1)).getStr("type"));
+        assertEquals("准备生成", JSONUtil.parseObj(result.get(1)).getStr("data"));
     }
 
     @Test
@@ -97,16 +113,25 @@ class TokenStreamErrorHandlingTest {
     /** 仅替代模型传输层，保留 LangChain4j 的真实回调注册和启动校验。 */
     private static class StubStreamingModel implements StreamingChatModel {
         private final boolean completeImmediately;
+        private final boolean emitThinking;
         private StreamingChatResponseHandler handler;
 
         StubStreamingModel(boolean completeImmediately) {
+            this(completeImmediately, false);
+        }
+
+        StubStreamingModel(boolean completeImmediately, boolean emitThinking) {
             this.completeImmediately = completeImmediately;
+            this.emitThinking = emitThinking;
         }
 
         @Override
         public void doChat(ChatRequest request, StreamingChatResponseHandler handler) {
             this.handler = handler;
             if (completeImmediately) {
+                if (emitThinking) {
+                    handler.onPartialThinking(new PartialThinking("先规划工程"));
+                }
                 handler.onPartialResponse("准备生成");
                 handler.onPartialResponse("生成完毕");
                 handler.onCompleteResponse(ChatResponse.builder()

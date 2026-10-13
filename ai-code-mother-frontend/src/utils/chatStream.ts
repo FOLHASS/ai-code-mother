@@ -14,7 +14,7 @@ export type ChatStreamMessage =
 
 /** 原生读取 SSE，独立于自动生成的 API 文件，避免接口生成时被覆盖。 */
 export async function* streamChatToGenCode(params: API.chatToGenCodeParams, signal?: AbortSignal) {
-  const query = new URLSearchParams({ appId: params.appId, message: params.message })
+  const query = new URLSearchParams({ appId: String(params.appId), message: params.message })
   const response = await fetch(`${API_BASE_URL}/app/chat/gen/code?${query}`, {
     credentials: 'include',
     headers: { Accept: 'text/event-stream, application/json' },

@@ -92,9 +92,6 @@ public class VueProjectBuilder {
         return baseCommand;
     }
 
-
-
-
     private boolean executeCommand(File workDir, String command, int timeout){
         try{
             log.info("在目录{}中执行了命令：{}", workDir, command);

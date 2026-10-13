@@ -1,6 +1,8 @@
 package com.xy.aicodemother.core.handler;
 
 import cn.hutool.json.JSONUtil;
+import com.xy.aicodemother.ai.model.AiResponseMessage;
+import com.xy.aicodemother.ai.model.AiThinkingMessage;
 import com.xy.aicodemother.ai.model.StreamMessageTypeEnum;
 import com.xy.aicodemother.ai.model.ToolExecutedMessage;
 import com.xy.aicodemother.ai.tools.ProjectFileTools;
@@ -209,6 +211,35 @@ class JsonMessageStreamHandlerTest {
         assertTrue(output.contains("工具执行结果"));
         assertTrue(output.contains("普通文本结果"));
         assertFalse(output.contains("文件读取完成"));
+    }
+
+    @Test
+    void thinkingIsNotIncludedInDisplayedAnswerOrSavedHistory() {
+        List<String> savedHistory = new ArrayList<>();
+        ChatHistoryService historyService = (ChatHistoryService) Proxy.newProxyInstance(
+                ChatHistoryService.class.getClassLoader(), new Class<?>[]{ChatHistoryService.class},
+                (proxy, method, values) -> {
+                    savedHistory.add((String) values[1]);
+                    return true;
+                });
+        User user = new User();
+        user.setId(USER_ID);
+        JsonMessageStreamHandler handler = new JsonMessageStreamHandler();
+        ReflectionTestUtils.setField(handler, "vueProjectBuilder", new VueProjectBuilder() {
+            @Override
+            public boolean buildProject(String projectPath) {
+                return true;
+            }
+        });
+
+        List<String> output = handler.handle(Flux.just(
+                        JSONUtil.toJsonStr(new AiThinkingMessage("内部推理片段")),
+                        JSONUtil.toJsonStr(new AiResponseMessage("最终回复"))),
+                        historyService, APP_ID, user)
+                .collectList().block(Duration.ofSeconds(5));
+
+        assertEquals(List.of("最终回复"), output);
+        assertEquals(List.of("最终回复"), savedHistory);
     }
 
     private String display(String toolName, Map<String, ?> arguments, Object result) {
