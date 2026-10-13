@@ -18,6 +18,8 @@ public class ReasoningStreamingChatModelConfig {
 
     private String apiKey;
 
+    private String modelName;
+
     private String timeout;
 
     /**
@@ -26,7 +28,6 @@ public class ReasoningStreamingChatModelConfig {
      */
     @Bean
     public StreamingChatModel reasoningStreamingChatModel() {
-        final String modelName = "deepseek-v4-flash-0731";
         final int maxTokens = 64768;
         return OpenAiStreamingChatModel.builder()
                 // 明确使用 Spring HTTP 客户端，避免与 JDK 客户端的 SPI 自动发现冲突。
@@ -38,6 +39,7 @@ public class ReasoningStreamingChatModelConfig {
                 .logResponses(false)
                 .timeout(Duration.ofSeconds(600))
                 .reasoningEffort("low")
+                .returnThinking(true)
                 .build();
     }
 

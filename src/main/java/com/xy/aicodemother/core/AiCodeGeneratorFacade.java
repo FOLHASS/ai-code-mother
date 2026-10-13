@@ -80,14 +80,10 @@ public class AiCodeGeneratorFacade {
             AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
 
             return switch (codeGenTypeEnum) {
-                case HTML -> {
-                    Flux<String> codeStream = aiCodeGeneratorService.generateCodeStream(userMessage);
-                    yield processCodeStream(codeStream, CodeGenTypeEnum.HTML, appId);
-                }
-                case MULTI_FILE -> {
-                    Flux<String> codeStream = aiCodeGeneratorService.generateMultiFileCodeStream(userMessage);
-                    yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE, appId);
-                }
+                case HTML -> processCodeStream(
+                        aiCodeGeneratorService.generateCodeStream(userMessage), CodeGenTypeEnum.HTML, appId);
+                case MULTI_FILE -> processCodeStream(
+                        aiCodeGeneratorService.generateMultiFileCodeStream(userMessage), CodeGenTypeEnum.MULTI_FILE, appId);
                 case VUE_PROJECT -> toFlux(aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage));
                 default -> {
                     String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
@@ -106,7 +102,10 @@ public class AiCodeGeneratorFacade {
      */
     public static Flux<String> toFlux(TokenStream tokenStream) {
         return Flux.create(sink -> {
-            tokenStream.onPartialResponse(content -> {
+            tokenStream.onPartialThinking(thinking -> {
+                        ThinkingMessage thinkingMessage = new ThinkingMessage(thinking.text());
+                        sink.next(JSONUtil.toJsonStr(thinkingMessage));
+                    }).onPartialResponse(content -> {
                         AiResponseMessage aiResponseMessage = new AiResponseMessage(content);
                         sink.next(JSONUtil.toJsonStr(aiResponseMessage));
                     }).onPartialToolCall(before -> {
@@ -123,20 +122,24 @@ public class AiCodeGeneratorFacade {
 
 
     /**
-     * 通用流式代码处理方法
+     * 通用流式代码处理方法。
+     * <p>将 TokenStream 转成消息流透传给前端，同时从中提取 AI 正文，待流结束后解析并保存代码。</p>
      *
-     * @param codeStream  代码流
+     * @param tokenStream 模型流式响应的 TokenStream
      * @param codeGenType 代码生成类型
      * @return 流式响应
      */
-    private Flux<String> processCodeStream(Flux<String> codeStream, CodeGenTypeEnum codeGenType, long appId) {
+    private Flux<String> processCodeStream(TokenStream tokenStream, CodeGenTypeEnum codeGenType, long appId) {
         StringBuilder codeBuilder = new StringBuilder();
-        java.util.concurrent.atomic.AtomicInteger chunkIndex = new java.util.concurrent.atomic.AtomicInteger();
-        // 实时收集代码片段
-        return codeStream
-                .doOnNext(chunk -> {
-                    int index = chunkIndex.incrementAndGet();
-                    codeBuilder.append(chunk);
+        // 将 TokenStream 转为消息流，正文、思考、工具事件全部透传给前端。
+        Flux<String> messageStream = toFlux(tokenStream);
+        // 实时收集 AI 正文片段；思考与工具事件不进入源码解析。
+        return messageStream
+                .doOnNext(messageJson -> {
+                    AiResponseMessage aiResponse = parseAiResponse(messageJson);
+                    if (aiResponse != null && aiResponse.getData() != null) {
+                        codeBuilder.append(aiResponse.getData());
+                    }
                 })
                 .concatWith(Mono.defer(() -> {
                     try {
@@ -150,6 +153,22 @@ public class AiCodeGeneratorFacade {
                         return Mono.error(e);
                     }
                 }));
+    }
+
+    /**
+     * 从消息流 JSON 中解析 AI 正文消息，非正文消息返回 null。
+     */
+    private AiResponseMessage parseAiResponse(String messageJson) {
+        try {
+            String type = JSONUtil.parseObj(messageJson).getStr("type");
+            if (StreamMessageTypeEnum.AI_RESPONSE.getValue().equals(type)) {
+                return JSONUtil.toBean(messageJson, AiResponseMessage.class);
+            }
+            return null;
+        } catch (Exception e) {
+            log.warn("解析流式消息失败: {}", messageJson, e);
+            return null;
+        }
     }
 
 }

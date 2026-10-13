@@ -93,6 +93,8 @@ const appendStreamMessage = (assistantMessage: ChatMessage, chunk: ChatStreamMes
   const shouldScroll = !list || list.scrollHeight - list.scrollTop - list.clientHeight < 80
   if (chunk.type === 'ai_response') {
     assistantMessage.content += chunk.content
+  } else if (chunk.type === 'thinking') {
+    assistantMessage.thinking = (assistantMessage.thinking || '') + chunk.content
   } else {
     const tools = (assistantMessage.toolCalls ??= [])
     // 同一次工具调用通过 ID 更新状态；没有 ID 时匹配最近一次同名调用。
@@ -525,8 +527,16 @@ onUnmounted(() => {
                 <span v-if="!item.content && item.loading" class="typing-dots"
                   ><i></i><i></i><i></i
                 ></span>
+                <details
+                  v-if="item.role === 'assistant' && item.thinking"
+                  class="thinking-block"
+                  :open="!item.content"
+                >
+                  <summary>思考过程</summary>
+                  <div class="thinking-content">{{ item.thinking }}</div>
+                </details>
                 <div
-                  v-else-if="item.role === 'assistant'"
+                  v-if="item.role === 'assistant' && item.content"
                   class="markdown-content"
                   @click="copyCode"
                   v-html="renderAssistantMessage(item.content)"
@@ -1029,6 +1039,28 @@ onUnmounted(() => {
 .message-error {
   color: #b6535d;
   background: #fff1f1;
+}
+.thinking-block {
+  margin-top: 6px;
+  padding: 7px 10px;
+  color: #6c7e87;
+  font-size: 12px;
+  line-height: 1.55;
+  background: #f2f6f7;
+  border: 1px solid #e0e9eb;
+  border-radius: 7px;
+}
+.thinking-block summary {
+  color: #328675;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+.thinking-content {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .tool-calls {
   display: grid;

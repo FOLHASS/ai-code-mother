@@ -1,8 +1,9 @@
 import { API_BASE_URL } from '@/request'
 
-/** AI 正文和工具执行状态分开传递，工具参数及结果不拼接进 AI 正文。 */
+/** AI 正文和工具执行状态分开传递，模型思考过程也单独传递，工具参数及结果不拼接进 AI 正文。 */
 export type ChatStreamMessage =
   | { type: 'ai_response'; content: string }
+  | { type: 'thinking'; content: string }
   | {
       type: 'tool_request' | 'tool_executed'
       content?: string
@@ -29,6 +30,17 @@ export async function* streamChatToGenCode(params: API.chatToGenCodeParams, sign
   }
   if (!response.body) throw new Error('代码生成响应为空')
 
+  const tryParse = (raw: string): Record<string, unknown> | null => {
+    try {
+      const value = JSON.parse(raw)
+      return value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : null
+    } catch {
+      return null
+    }
+  }
+
   const parseEvent = (event: string): ChatStreamMessage | { done: true } | null => {
     const lines = event.split(/\r?\n/)
     const type = lines.find((line) => line.startsWith('event:'))?.slice(6).trim()
@@ -49,7 +61,7 @@ export async function* streamChatToGenCode(params: API.chatToGenCodeParams, sign
         d?: string; code?: number; message?: string
       }
       if (detail.code !== undefined && detail.code !== 0) throw new Error(detail.message || '代码生成失败')
-      if (detail.type === 'ai_response') {
+      if (detail.type === 'ai_response' || detail.type === 'thinking') {
         return typeof detail.content === 'string' ? { type: detail.type, content: detail.content } : null
       }
       if (detail.type === 'tool_request' || detail.type === 'tool_executed') {
@@ -63,7 +75,15 @@ export async function* streamChatToGenCode(params: API.chatToGenCodeParams, sign
       }
       // 保留旧版文本流兼容，未知结构事件不作为 AI 文本显示。
       if (detail.type) return null
-      if (typeof detail.d === 'string') return { type: 'ai_response', content: detail.d }
+      // 后端将消息包装为 {"d": chunk}，chunk 可能是纯文本，也可能是二次编码的结构化消息（如思考过程）。
+      if (typeof detail.d === 'string') {
+        const inner = tryParse(detail.d)
+        if (inner && typeof inner.type === 'string') {
+          const msg = inner as ChatStreamMessage
+          return msg
+        }
+        return { type: 'ai_response', content: detail.d }
+      }
     }
     return { type: 'ai_response', content: data }
   }
