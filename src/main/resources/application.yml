@@ -1,7 +1,8 @@
 spring:
   session:
-    store-type: redis
-    timeout: 259200
+    data:
+      redis:
+        namespace: ai-code-mother:session
   application:
     name: ai-code-mother-backend
     # mysql
@@ -14,7 +15,6 @@ spring:
     redis:
       host: localhost
       port: 6379
-      password:
       ttl: 3600
   profiles:
     active: local

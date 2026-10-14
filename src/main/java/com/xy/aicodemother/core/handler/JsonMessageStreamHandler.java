@@ -74,7 +74,6 @@ public class JsonMessageStreamHandler {
                                 AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId);
                         ThrowUtils.throwIf(!built, ErrorCode.OPERATION_ERROR, "Vue 项目构建失败，暂时无法预览，请重试");
                     }
-
                 })
                 .doOnError(error -> {
                     // 如果AI回复失败，也要记录错误消息
