@@ -4,6 +4,7 @@ export type ChatMessage = {
   createTime?: string
   role: 'user' | 'assistant'
   content: string
+  thinking?: string
   loading?: boolean
   error?: boolean
   toolCalls?: {

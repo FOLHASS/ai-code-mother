@@ -3,7 +3,6 @@ package com.xy.aicodemother.ai;
 import com.xy.aicodemother.ai.model.HtmlCodeResult;
 import com.xy.aicodemother.ai.model.MultiFileCodeResult;
 import dev.langchain4j.service.*;
-import reactor.core.publisher.Flux;
 
 
 public interface AiCodeGeneratorService {
@@ -30,7 +29,7 @@ public interface AiCodeGeneratorService {
      * @return
      */
     @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
-    Flux<String> generateCodeStream(String userMessage);
+    TokenStream generateCodeStream(String userMessage);
 
     /**
      * 根据用户输入生成多文件代码
@@ -38,7 +37,7 @@ public interface AiCodeGeneratorService {
      * @return
      */
     @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
-    Flux<String>  generateMultiFileCodeStream(String userMessage);
+    TokenStream generateMultiFileCodeStream(String userMessage);
 
 
     /**

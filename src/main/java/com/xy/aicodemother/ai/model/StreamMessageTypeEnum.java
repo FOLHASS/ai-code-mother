@@ -9,9 +9,9 @@ import lombok.Getter;
 public enum StreamMessageTypeEnum {
 
     AI_RESPONSE("ai_response", "AI响应"),
+    THINKING("thinking", "思考过程"),
     TOOL_REQUEST("tool_request", "工具请求"),
-    TOOL_EXECUTED("tool_executed", "工具执行结果"),
-    AI_THINKING("ai_thinking", "AI思考过程");
+    TOOL_EXECUTED("tool_executed", "工具执行结果");
 
     private final String value;
     private final String text;

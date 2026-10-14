@@ -18,9 +18,9 @@ public class ReasoningStreamingChatModelConfig {
 
     private String apiKey;
 
-    private String timeout;
-
     private String modelName;
+
+    private String timeout;
 
     /**
      * 提供带推理能力的流式模型（用于Vue项目的生成和工具的调用）

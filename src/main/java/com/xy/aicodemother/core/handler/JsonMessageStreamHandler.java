@@ -12,13 +12,12 @@ import com.xy.aicodemother.exception.ErrorCode;
 import com.xy.aicodemother.exception.ThrowUtils;
 import com.xy.aicodemother.model.entity.User;
 import com.xy.aicodemother.model.enums.ChatHistoryMessageTypeEnum;
+import com.xy.aicodemother.model.enums.CodeGenTypeEnum;
 import com.xy.aicodemother.service.ChatHistoryService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -26,7 +25,8 @@ import java.util.regex.Pattern;
 
 /**
  * JSON 消息流处理器
- * 处理 VUE_PROJECT 类型的复杂流式响应，包含工具调用信息
+ * 统一处理 HTML、MULTI_FILE、VUE_PROJECT 三种类型的流式响应，
+ * 正文、思考过程与工具调用信息一并透传。
  */
 @Slf4j
 @Component
@@ -40,18 +40,19 @@ public class JsonMessageStreamHandler {
     private static final Pattern BACKTICKS = Pattern.compile("`+");
 
     /**
-     * 处理 TokenStream（VUE_PROJECT）
+     * 处理消息流
      * 解析 JSON 消息并重组为完整的响应格式
      *
      * @param originFlux         原始流
      * @param chatHistoryService 聊天历史服务
      * @param appId              应用ID
      * @param loginUser          登录用户
+     * @param codeGenType        代码生成类型
      * @return 处理后的流
      */
     public Flux<String> handle(Flux<String> originFlux,
                                ChatHistoryService chatHistoryService,
-                               long appId, User loginUser) {
+                               long appId, User loginUser, CodeGenTypeEnum codeGenType) {
         // 收集数据用于生成后端记忆格式
         StringBuilder chatHistoryStringBuilder = new StringBuilder();
         // 用于跟踪已经见过的工具ID，判断是否是第一次调用
@@ -68,9 +69,11 @@ public class JsonMessageStreamHandler {
                     String aiResponse = chatHistoryStringBuilder.toString();
                     chatHistoryService.addChatHistory(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
 
-                    boolean built = vueProjectBuilder.buildProject(
-                            AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId);
-                    ThrowUtils.throwIf(!built, ErrorCode.OPERATION_ERROR, "Vue 项目构建失败，暂时无法预览，请重试");
+                    if (codeGenType == CodeGenTypeEnum.VUE_PROJECT) {
+                        boolean built = vueProjectBuilder.buildProject(
+                                AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId);
+                        ThrowUtils.throwIf(!built, ErrorCode.OPERATION_ERROR, "Vue 项目构建失败，暂时无法预览，请重试");
+                    }
 
                 })
                 .doOnError(error -> {
@@ -88,16 +91,16 @@ public class JsonMessageStreamHandler {
         StreamMessage streamMessage = JSONUtil.toBean(chunk, StreamMessage.class);
         StreamMessageTypeEnum typeEnum = StreamMessageTypeEnum.getEnumByValue(streamMessage.getType());
         switch (typeEnum) {
-            case AI_THINKING -> {
-                // 思考片段不属于最终回复，不能写入对话历史或生成代码。
-                return "";
-            }
             case AI_RESPONSE -> {
                 AiResponseMessage aiMessage = JSONUtil.toBean(chunk, AiResponseMessage.class);
                 String data = aiMessage.getData();
                 // 直接拼接响应
                 chatHistoryStringBuilder.append(data);
                 return data;
+            }
+            case THINKING -> {
+                // 思考内容原样透传给前端展示，不进入落库路径。
+                return chunk;
             }
             case TOOL_REQUEST -> {
                 ToolRequestMessage toolRequestMessage = JSONUtil.toBean(chunk, ToolRequestMessage.class);

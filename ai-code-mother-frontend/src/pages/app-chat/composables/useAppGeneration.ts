@@ -46,6 +46,8 @@ export function useAppGeneration({
     const shouldScroll = !list || list.scrollHeight - list.scrollTop - list.clientHeight < 80
     if (chunk.type === 'ai_response') {
       assistantMessage.content += chunk.content
+    } else if (chunk.type === 'thinking') {
+      assistantMessage.thinking = (assistantMessage.thinking || '') + chunk.content
     } else {
       const tools = (assistantMessage.toolCalls ??= [])
       // 同一次工具调用通过 ID 更新状态；没有 ID 时匹配最近一次同名调用。
