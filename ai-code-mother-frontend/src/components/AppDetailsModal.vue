@@ -3,6 +3,7 @@ import { Modal } from 'ant-design-vue'
 
 import AppCover from '@/components/AppCover.vue'
 import { formatDate } from '@/utils/app.ts'
+import { formatCodeGenType } from '@/utils/codeGenTypes.ts'
 
 defineProps<{
   open: boolean
@@ -36,7 +37,7 @@ const emit = defineEmits<{
 
       <dl class="app-details__meta">
         <div><dt>应用 ID</dt><dd>{{ app.id || '-' }}</dd></div>
-        <div><dt>生成模式</dt><dd>{{ app.codeGenType || '-' }}</dd></div>
+        <div><dt>生成模式</dt><dd>{{ app.codeGenType ? formatCodeGenType(app.codeGenType) : '-' }}</dd></div>
         <div><dt>创建时间</dt><dd>{{ formatDate(app.createTime) }}</dd></div>
         <div><dt>部署状态</dt><dd>{{ app.deployKey ? '已部署' : '未部署' }}</dd></div>
       </dl>

@@ -9,6 +9,7 @@ import { useAppPreview } from './useAppPreview.ts'
 import { useAppActions } from './useAppActions.ts'
 import { useAppHistory } from './useAppHistory.ts'
 import { useAppGeneration } from './useAppGeneration.ts'
+import { useVisualEditor } from './useVisualEditor.ts'
 import type { ChatMessage } from '@/utils/chatHistory.ts'
 import { asApiLongId } from '@/utils/id.ts'
 
@@ -20,7 +21,9 @@ export function useAppChat() {
   const messages = ref<ChatMessage[]>([])
   const isLoadingApp = ref(true)
   const messageList = ref<HTMLElement | null>(null)
-  const setMessageList = (element: HTMLElement | null) => { messageList.value = element }
+  const setMessageList = (element: HTMLElement | null) => {
+    messageList.value = element
+  }
   const hasSentInitialPrompt = ref(false)
   let appVersion = 0
 
@@ -68,6 +71,7 @@ export function useAppChat() {
     getVersion: () => appVersion,
   })
 
+  const visualEditor = useVisualEditor(previewUrl)
   const { input, isStreaming, resetGeneration, sendMessage } = useAppGeneration({
     app,
     canInteract,
@@ -78,7 +82,28 @@ export function useAppChat() {
     showPreview,
     scrollToBottom,
     getVersion: () => appVersion,
+    prepareMessage: visualEditor.prepareMessage,
+    onMessageSent: visualEditor.resetVisualEditor,
   })
+  const canVisualEdit = computed(
+    () =>
+      canInteract.value &&
+      historyLoaded.value &&
+      hasGeneratedWebsite.value &&
+      Boolean(previewUrl.value) &&
+      !isLoadingApp.value &&
+      !isStreaming.value,
+  )
+  watch(
+    canVisualEdit,
+    (available) => {
+      if (!available) visualEditor.resetVisualEditor()
+    },
+    { flush: 'sync' },
+  )
+  const toggleEditMode = () => {
+    if (canVisualEdit.value) visualEditor.toggleEditMode()
+  }
   const {
     isDeploying,
     isDownloading,
@@ -109,6 +134,7 @@ export function useAppChat() {
 
   const loadApp = async () => {
     const version = ++appVersion
+    visualEditor.resetVisualEditor()
     resetGeneration()
     app.value = null
     messages.value = []
@@ -170,6 +196,12 @@ export function useAppChat() {
     app,
     messages,
     input,
+    isEditMode: visualEditor.isEditMode,
+    selectedElement: visualEditor.selectedElement,
+    setPreviewIframe: visualEditor.setPreviewIframe,
+    clearSelection: visualEditor.clearSelection,
+    canVisualEdit,
+    toggleEditMode,
     isLoadingApp,
     isStreaming,
     isDeploying,

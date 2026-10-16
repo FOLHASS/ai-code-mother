@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { onBeforeUnmount, ref, watch } from 'vue'
+
 defineProps<{
   codeGenType?: string
   hasApp: boolean
@@ -6,9 +8,16 @@ defineProps<{
   previewUrl: string
   previewError: string
   isStreaming: boolean
+  isEditMode: boolean
 }>()
 
-const emit = defineEmits<{ refresh: [] }>()
+const emit = defineEmits<{
+  refresh: []
+  'iframe-ready': [iframe: HTMLIFrameElement | null]
+}>()
+const previewIframe = ref<HTMLIFrameElement | null>(null)
+watch(previewIframe, (iframe) => emit('iframe-ready', iframe), { flush: 'post' })
+onBeforeUnmount(() => emit('iframe-ready', null))
 </script>
 
 <template>
@@ -18,7 +27,12 @@ const emit = defineEmits<{ refresh: [] }>()
         <p>LIVE PREVIEW</p>
         <h2>生成后的网站展示</h2>
       </div>
-      <span v-if="hasGeneratedWebsite" class="preview-status"><i></i> 网站预览</span>
+      <span
+        v-if="hasGeneratedWebsite"
+        :class="{ 'preview-status--editing': isEditMode }"
+        class="preview-status"
+        ><i></i> {{ isEditMode ? '编辑模式 · 点击选择元素' : '网站预览' }}</span
+      >
     </div>
     <div class="browser-frame">
       <div class="browser-toolbar">
@@ -37,6 +51,7 @@ const emit = defineEmits<{ refresh: [] }>()
       <div class="browser-content">
         <iframe
           v-if="hasGeneratedWebsite && previewUrl"
+          ref="previewIframe"
           :src="previewUrl"
           sandbox="allow-forms allow-modals allow-popups allow-scripts allow-same-origin"
           title="生成的网站预览"
@@ -110,6 +125,13 @@ const emit = defineEmits<{ refresh: [] }>()
   height: 6px;
   background: #29b78a;
   border-radius: 50%;
+}
+.preview-status--editing {
+  color: #1b70c9;
+  background: #eaf4ff;
+}
+.preview-status--editing i {
+  background: #1677ff;
 }
 
 .preview-panel {

@@ -8,6 +8,7 @@ import AppCover from '@/components/AppCover.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useLoginUserStore } from '@/stores/loginUserStore.ts'
 import { formatDate } from '@/utils/app.ts'
+import { formatCodeGenType } from '@/utils/codeGenTypes.ts'
 import { asApiLongId } from '@/utils/id.ts'
 
 const route = useRoute()
@@ -105,7 +106,7 @@ onMounted(async () => {
           <AppCover class="summary-cover" :app="app" size="summary" />
           <h2>{{ app.appName || '未命名应用' }}</h2>
           <p>{{ app.initPrompt || '暂无初始需求' }}</p>
-          <dl><div><dt>应用 ID</dt><dd>{{ app.id }}</dd></div><div><dt>创建时间</dt><dd>{{ formatDate(app.createTime) }}</dd></div><div><dt>生成模式</dt><dd>{{ app.codeGenType || '-' }}</dd></div></dl>
+          <dl><div><dt>应用 ID</dt><dd>{{ app.id }}</dd></div><div><dt>创建时间</dt><dd>{{ formatDate(app.createTime) }}</dd></div><div><dt>生成模式</dt><dd>{{ app.codeGenType ? formatCodeGenType(app.codeGenType) : '-' }}</dd></div></dl>
         </aside>
         <form class="edit-panel" @submit.prevent="save">
           <div class="panel-heading"><div><h2>基础信息</h2><p>应用名称会显示在主页卡片和对话页面顶部。</p></div><span>{{ isAdmin ? 'ADMIN EDIT' : 'MY APP' }}</span></div>

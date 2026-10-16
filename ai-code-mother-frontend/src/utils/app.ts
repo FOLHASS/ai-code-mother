@@ -1,15 +1,14 @@
-import { API_BASE_URL } from '@/request'
+import { getDeployUrl as buildDeployUrl, getStaticPreviewUrl } from '@/config/env.ts'
 
-// 部署站点由 localhost 提供；生成中的网站仍通过 API 静态资源地址预览。
+// 部署地址和生成中网站的预览地址分别由全局配置生成。
 export const getDeployUrl = (app: Pick<API.AppVO, 'deployKey'>) => {
   const deployKey = app.deployKey?.trim()
-  return deployKey ? `http://localhost/${encodeURIComponent(deployKey)}` : ''
+  return deployKey ? buildDeployUrl(deployKey) : ''
 }
 
 export const getPreviewUrl = (app: Pick<API.AppVO, 'id' | 'codeGenType'>, cacheBust = false) => {
   if (!app.id || !app.codeGenType) return ''
-  const previewPath = app.codeGenType === 'vue_project' ? 'dist/' : ''
-  const url = `${API_BASE_URL}/static/${app.codeGenType}_${app.id}/${previewPath}`
+  const url = getStaticPreviewUrl(app.codeGenType, String(app.id))
   return cacheBust ? `${url}?t=${Date.now()}` : url
 }
 

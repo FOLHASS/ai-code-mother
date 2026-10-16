@@ -15,6 +15,8 @@ type GenerationContext = {
   showPreview: (cacheBust?: boolean) => Promise<void>
   scrollToBottom: () => Promise<void>
   getVersion: () => number
+  prepareMessage?: (content: string) => string
+  onMessageSent?: () => void
 }
 
 /** 一次生成对应一条用户消息和一条可流式更新的 AI 消息。 */
@@ -28,6 +30,8 @@ export function useAppGeneration({
   showPreview,
   scrollToBottom,
   getVersion,
+  prepareMessage,
+  onMessageSent,
 }: GenerationContext) {
   const input = ref('')
   const isStreaming = ref(false)
@@ -99,6 +103,7 @@ export function useAppGeneration({
       return
     const version = getVersion()
     const currentAppId = app.value.id
+    const prompt = !isInitial && prepareMessage ? prepareMessage(content) : content
     const controller = new AbortController()
     generationController = controller
     if (!isInitial) input.value = ''
@@ -117,11 +122,12 @@ export function useAppGeneration({
     }
     messages.value.push(assistantMessage)
     isStreaming.value = true
+    onMessageSent?.()
     await scrollToBottom()
 
     try {
       for await (const chunk of streamChatToGenCode(
-        { appId: asApiLongId(String(currentAppId)), message: content },
+        { appId: asApiLongId(String(currentAppId)), message: prompt },
         controller.signal,
       )) {
         if (version !== getVersion()) return

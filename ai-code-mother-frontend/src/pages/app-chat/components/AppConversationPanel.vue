@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import type { ChatMessage } from '@/utils/chatHistory.ts'
+import type { ElementInfo } from '@/utils/visualEditor.ts'
 import ChatComposer from './ChatComposer.vue'
 import ChatMessageList from './ChatMessageList.vue'
 
@@ -18,6 +19,9 @@ type Props = {
   canInteract: boolean
   canReadHistory: boolean
   userMessageLabel: string
+  canVisualEdit: boolean
+  isEditMode: boolean
+  selectedElement: ElementInfo | null
 }
 const props = defineProps<Props>()
 const emit = defineEmits<{
@@ -26,6 +30,8 @@ const emit = defineEmits<{
   'retry-history': []
   'load-history': []
   send: []
+  'toggle-edit': []
+  'clear-selection': []
 }>()
 const input = computed({
   get: () => props.modelValue,
@@ -66,7 +72,12 @@ const input = computed({
       :is-logged-in="isLoggedIn"
       :can-interact="canInteract"
       :history-loaded="historyLoaded"
+      :can-visual-edit="canVisualEdit"
+      :is-edit-mode="isEditMode"
+      :selected-element="selectedElement"
       @send="emit('send')"
+      @toggle-edit="emit('toggle-edit')"
+      @clear-selection="emit('clear-selection')"
     />
   </section>
 </template>

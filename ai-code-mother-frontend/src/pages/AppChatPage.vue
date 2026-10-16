@@ -14,6 +14,12 @@ const {
   app,
   messages,
   input,
+  isEditMode,
+  selectedElement,
+  canVisualEdit,
+  setPreviewIframe,
+  toggleEditMode,
+  clearSelection,
   isLoadingApp,
   isStreaming,
   isDeploying,
@@ -102,10 +108,15 @@ const removeApp = () => {
         :can-interact="canInteract"
         :can-read-history="canReadHistory"
         :user-message-label="userMessageLabel"
+        :can-visual-edit="canVisualEdit"
+        :is-edit-mode="isEditMode"
+        :selected-element="selectedElement"
         @list-ready="setMessageList"
         @retry-history="retryHistory"
         @load-history="loadHistory(true)"
         @send="sendMessage()"
+        @toggle-edit="toggleEditMode"
+        @clear-selection="clearSelection"
       />
 
       <AppPreviewPanel
@@ -115,7 +126,9 @@ const removeApp = () => {
         :preview-url="previewUrl"
         :preview-error="previewError"
         :is-streaming="isStreaming"
+        :is-edit-mode="isEditMode"
         @refresh="showPreview(true)"
+        @iframe-ready="setPreviewIframe"
       />
     </div>
   </main>

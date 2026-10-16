@@ -1,9 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import { APP_BASE_URL } from '@/config/env.ts'
 import { useLoginUserStore } from '@/stores/loginUserStore.ts'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(APP_BASE_URL),
   routes: [
     {
       path: '/',

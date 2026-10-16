@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import UserAvatar from '@/components/UserAvatar.vue'
 import { formatDateTime, getDeployUrl } from '@/utils/app.ts'
+import { formatCodeGenType } from '@/utils/codeGenTypes.ts'
 
 const props = defineProps<{
   app: API.AppVO
@@ -18,15 +19,9 @@ const creatorName = computed(
   () => props.app.user?.userName?.trim() || props.app.user?.userAccount?.trim() || '未知创作者',
 )
 
-const generationType = computed(() => {
-  const labels: Record<string, string> = {
-    html: '原生 HTML',
-    multi_file: '原生多文件',
-    vue_project: 'Vue 项目',
-  }
-  return props.app.codeGenType ? labels[props.app.codeGenType] || props.app.codeGenType : '尚未生成'
-})
-
+const generationType = computed(() =>
+  props.app.codeGenType ? formatCodeGenType(props.app.codeGenType) : '尚未生成',
+)
 const workUrl = computed(() => props.deployedUrl || getDeployUrl(props.app))
 </script>
 

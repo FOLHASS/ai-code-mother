@@ -10,6 +10,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import PageStat from '@/components/PageStat.vue'
 import { useLoginUserStore } from '@/stores/loginUserStore.ts'
 import { formatDate } from '@/utils/app.ts'
+import { CODE_GEN_TYPE_OPTIONS, formatCodeGenType } from '@/utils/codeGenTypes.ts'
 
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
@@ -136,7 +137,7 @@ onMounted(async () => {
         <label><span>封面地址</span><input v-model="searchForm.cover" type="text" placeholder="输入封面地址" /></label>
         <label><span>用户 ID</span><input v-model="searchForm.userId" type="text" inputmode="numeric" placeholder="创建者 ID" /></label>
         <label><span>优先级</span><input v-model.number="searchForm.priority" type="number" min="0" placeholder="如 99" /></label>
-        <label><span>生成类型</span><select v-model="searchForm.codeGenType"><option value="">全部类型</option><option value="html">HTML</option><option value="multi_file">多文件</option></select></label>
+        <label><span>生成类型</span><select v-model="searchForm.codeGenType"><option value="">全部类型</option><option v-for="option in CODE_GEN_TYPE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option></select></label>
         <label><span>部署标识</span><input v-model="searchForm.deployKey" type="text" placeholder="部署标识" /></label>
       </div>
       <label class="prompt-filter"><span>初始需求</span><input v-model="searchForm.initPrompt" type="text" placeholder="搜索初始需求内容" /></label>
@@ -153,7 +154,7 @@ onMounted(async () => {
             <tr v-for="app in apps" v-else :key="app.id">
               <td><div class="app-cell"><AppCover :app="app" size="table" /><div><strong>{{ app.appName || '未命名应用' }}</strong><small>#{{ app.id }}</small></div></div></td>
               <td><div class="owner-cell"><span>{{ app.user?.userName || '用户 #' + (app.userId || '-') }}</span><small>ID {{ app.userId || '-' }}</small></div></td>
-              <td><span class="type-badge">{{ app.codeGenType === 'multi_file' ? '多文件' : app.codeGenType || '-' }}</span></td>
+              <td><span class="type-badge">{{ app.codeGenType ? formatCodeGenType(app.codeGenType) : '-' }}</span></td>
               <td><span class="priority-badge" :class="{ featured: app.priority === 99 }">{{ app.priority === 99 ? '精选' : app.priority ?? 0 }}</span></td>
               <td><span class="deploy-state" :class="{ deployed: app.deployKey }"><i></i>{{ app.deployKey ? '已部署' : '未部署' }}</span></td>
               <td class="date-cell">{{ formatDate(app.createTime) }}</td>

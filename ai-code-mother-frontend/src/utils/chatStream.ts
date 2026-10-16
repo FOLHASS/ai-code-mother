@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '@/request'
+import { API_BASE_URL } from '@/config/env.ts'
 
 /** AI 正文和工具执行状态分开传递，模型思考过程也单独传递，工具参数及结果不拼接进 AI 正文。 */
 export type ChatStreamMessage =
