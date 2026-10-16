@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js/lib/common'
@@ -9,7 +9,7 @@ import logoUrl from '@/assets/logo.png'
 import { formatDateTime } from '@/utils/app.ts'
 import type { ChatMessage } from '@/utils/chatHistory.ts'
 
-defineProps<{
+const props = defineProps<{
   messages: ChatMessage[]
   isLoadingApp: boolean
   isLoadingHistory: boolean
@@ -54,11 +54,64 @@ const markdown = new MarkdownIt({
   },
 })
 
-const renderAssistantMessage = (content: string) => {
-  if (!content) return ''
-  return DOMPurify.sanitize(markdown.render(content), {
+// v-html 会在流式内容变化时重建子节点；按消息和代码块序号记住手动展开状态。
+const expandedCodeBlocks = new Map<string, Set<number>>()
+type CodeBlockEnv = { codeBlockIndex: number; expanded: Set<number> }
+
+const wrapCodeBlock = (html: string, language: string, env: CodeBlockEnv) => {
+  const index = env.codeBlockIndex++
+  const label = language.trim().split(/\s+/)[0]
+  return `<details class="code-block" data-code-index="${index}"${env.expanded.has(index) ? ' open' : ''}><summary>代码块${label ? ` · ${escapeHtml(label)}` : ''}</summary>${html}</details>`
+}
+
+const renderFence = markdown.renderer.rules.fence
+if (renderFence) {
+  markdown.renderer.rules.fence = (tokens, index, options, env, renderer) =>
+    wrapCodeBlock(
+      renderFence(tokens, index, options, env, renderer),
+      tokens[index]?.info || '',
+      env as CodeBlockEnv,
+    )
+}
+const renderIndentedCode = markdown.renderer.rules.code_block
+if (renderIndentedCode) {
+  markdown.renderer.rules.code_block = (tokens, index, options, env, renderer) =>
+    wrapCodeBlock(
+      renderIndentedCode(tokens, index, options, env, renderer),
+      '',
+      env as CodeBlockEnv,
+    )
+}
+
+const renderAssistantMessage = (item: ChatMessage) => {
+  if (!item.content) return ''
+  const env: CodeBlockEnv = {
+    codeBlockIndex: 0,
+    expanded: expandedCodeBlocks.get(item.id) ?? new Set<number>(),
+  }
+  return DOMPurify.sanitize(markdown.render(item.content, env), {
     ADD_ATTR: ['target', 'rel'],
   })
+}
+
+watch(
+  () => props.messages,
+  (messages) => {
+    if (!messages.length) expandedCodeBlocks.clear()
+  },
+  { flush: 'sync' },
+)
+
+const handleCodeBlockToggle = (event: Event, messageId: string) => {
+  const block = event.target
+  if (!(block instanceof HTMLDetailsElement) || !block.classList.contains('code-block')) return
+  const index = Number(block.dataset.codeIndex)
+  if (!Number.isInteger(index)) return
+  const expanded = expandedCodeBlocks.get(messageId) ?? new Set<number>()
+  if (block.open) expanded.add(index)
+  else expanded.delete(index)
+  if (expanded.size) expandedCodeBlocks.set(messageId, expanded)
+  else expandedCodeBlocks.delete(messageId)
 }
 
 const copyCode = async (event: MouseEvent) => {
@@ -150,7 +203,8 @@ const copyCode = async (event: MouseEvent) => {
             v-if="item.role === 'assistant' && item.content"
             class="markdown-content"
             @click="copyCode"
-            v-html="renderAssistantMessage(item.content)"
+            @toggle.capture="handleCodeBlockToggle($event, item.id)"
+            v-html="renderAssistantMessage(item)"
           ></div>
           <pre v-else>{{ item.content }}</pre>
           <span
@@ -353,24 +407,36 @@ const copyCode = async (event: MouseEvent) => {
   background: #e9eff0;
   border-radius: 4px;
 }
-.markdown-content :deep(pre) {
-  position: relative;
+.markdown-content :deep(.code-block) {
   margin: 10px 0 3px;
-  padding: 14px;
-  color: #d9e7ea;
-  line-height: 1.55;
-  white-space: pre;
+  overflow: hidden;
   background: #17232d;
   border: 1px solid #29414a;
   border-radius: 8px;
 }
-.markdown-content :deep(pre)::before {
-  display: block;
-  margin-bottom: 8px;
+.markdown-content :deep(.code-block summary) {
+  padding: 8px 13px;
+  color: #b6c9cf;
+  font-size: 11px;
+  cursor: pointer;
+  user-select: none;
+  background: #20323c;
+}
+.markdown-content :deep(.code-block summary)::after {
+  float: right;
   color: #8da5ac;
-  font-size: 10px;
-  content: 'CODE';
-  letter-spacing: 0.12em;
+  content: '展开代码';
+}
+.markdown-content :deep(.code-block[open] summary)::after {
+  content: '收起代码';
+}
+.markdown-content :deep(.code-block pre) {
+  margin: 0;
+  padding: 14px;
+  overflow-x: auto;
+  color: #d9e7ea;
+  line-height: 1.55;
+  white-space: pre;
 }
 .markdown-content :deep(pre code) {
   color: inherit;
