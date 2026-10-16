@@ -1,6 +1,12 @@
 <script setup lang="ts">
+/**
+ * 资料编辑区域：渲染三个受控表单字段、恢复原值按钮及保存按钮。
+ * 所有表单业务通过 useProfileEditor 获取；本组件不接收用户 Props，避免草稿与登录资料出现两套来源。
+ * 昵称为应用层必填；头像输入的 type=url 提供浏览器原生格式检查；提交走表单 submit.prevent。
+ */
 import { useProfileEditor } from '../composables/useProfileEditor.ts'
 
+// 响应式草稿用于 v-model；同一个 isSaving 同时控制输入、恢复和提交操作。
 const { profileForm, isSaving, resetForm, handleSave } = useProfileEditor()
 </script>
 
@@ -61,6 +67,7 @@ p {
   margin-top: 0;
 }
 
+/* 白色卡片与资料摘要沿用相同的边框、圆角和阴影，维持整页视觉一致。 */
 .profile-form-panel {
   background: #fff;
   border: 1px solid #e4edf6;
@@ -100,6 +107,7 @@ p {
   letter-spacing: 0.12em;
 }
 
+/* 表单按字段纵向排布，并限制最大阅读宽度以免宽屏输入框过长。 */
 .profile-form {
   display: grid;
   max-width: 640px;
@@ -119,6 +127,7 @@ p {
   font-weight: 600;
 }
 
+/* 输入和多行简介共用基础样式，box-sizing 保证边框与内边距计入字段宽度。 */
 .field-item input,
 .field-item textarea {
   box-sizing: border-box;
@@ -149,6 +158,7 @@ p {
   box-shadow: 0 0 0 3px rgb(74 145 232 / 11%);
 }
 
+/* 视觉禁用反馈与模板中的 disabled 配合，保存期间用户不会改动正在提交的草稿。 */
 .field-item input:disabled,
 .field-item textarea:disabled,
 button:disabled {
@@ -156,6 +166,7 @@ button:disabled {
   opacity: 0.6;
 }
 
+/* 桌面操作区靠右排列，“恢复原值”不会触发表单提交。 */
 .form-footer {
   display: flex;
   justify-content: flex-end;
@@ -194,6 +205,7 @@ button:disabled {
   border-color: #8bb8e9;
 }
 
+/* 手机将说明区转为纵向，两枚操作按钮均分可用宽度，减少拥挤。 */
 @media (max-width: 480px) {
   .section-heading {
     flex-direction: column;

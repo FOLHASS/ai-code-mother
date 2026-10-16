@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/**
+ * 注册页：持有账号、密码、确认密码草稿，执行本地校验并调用注册接口。
+ * 注册成功后返回登录页并携带 redirect，不在本页设置登录身份；表单与页脚复用认证外壳插槽。
+ * 模板的原生 submit.prevent 阻止浏览器整页提交，提交状态用于锁定输入和按钮。
+ */
 import { computed, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -8,19 +13,30 @@ import AuthPageShell from '@/components/AuthPageShell.vue'
 
 const route = useRoute()
 const router = useRouter()
+// 请求草稿只在当前注册页存在；checkPassword 用于前端一致性校验并随请求交由后端处理。
 const formState = reactive<API.UserRegisterRequest>({
   userAccount: '',
   userPassword: '',
   checkPassword: '',
 })
+// 提交状态与错误提示相互独立：校验不通过时只更新错误，不进入网络加载状态。
 const isSubmitting = ref(false)
 const registerError = ref('')
 
+/**
+ * 沿用登录页的 redirect 规则：仅保留字符串且以 / 开头的值，其余情况回退到首页。
+ * 该值会传给登录页，由后续登录流程使用。
+ */
 const redirectPath = computed(() => {
   const redirect = route.query.redirect
   return typeof redirect === 'string' && redirect.startsWith('/') ? redirect : '/'
 })
 
+/**
+ * 检查当前表单并返回第一条错误文案；返回空字符串表示本地校验通过。
+ * 账号先去空格再校验 4–20 个字符；密码按原始输入校验 8–20 个字符并与确认密码比较。
+ * 这些检查用于及时反馈，最终的账号合法性和注册权限仍由接口判定。
+ */
 const validateForm = () => {
   const account = formState.userAccount?.trim() || ''
   const password = formState.userPassword || ''
@@ -33,6 +49,10 @@ const validateForm = () => {
   return ''
 }
 
+/**
+ * 完成“校验草稿 → 提交注册 → 提示成功 → 返回登录”的异步流程。
+ * 请求参数显式列出三个注册字段，避免把页面状态混入接口；网络和业务失败保留用户输入便于重试。
+ */
 const handleSubmit = async () => {
   registerError.value = validateForm()
   if (registerError.value) return
@@ -50,10 +70,12 @@ const handleSubmit = async () => {
       return
     }
 
+    // 注册接口成功仅代表账号创建完成，当前流程要求用户再执行登录。
     message.success('注册成功，请登录')
     await router.push({ path: '/user/login', query: { redirect: redirectPath.value } })
   } catch {
     registerError.value = '网络异常，请稍后重试'
+  // 无论业务返回、跳转结果或异常如何，都会恢复提交按钮的可用状态。
   } finally {
     isSubmitting.value = false
   }

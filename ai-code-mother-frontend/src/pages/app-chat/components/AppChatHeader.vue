@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/**
+ * 对话工作台顶部：显示应用标题、点击展开的详情，以及查看部署、下载和部署入口。
+ * 所有业务操作通过 emits 上报；组件只持有详情浮层的开关状态，不直接调用应用接口。
+ * 模板根据权限和忙碌状态禁用按钮，最终操作入口仍由组合式函数再次检查。
+ */
 import { DownloadOutlined, DownOutlined } from '@ant-design/icons-vue'
 import { Popover } from 'ant-design-vue'
 import { ref, watch } from 'vue'
@@ -7,6 +12,7 @@ import AppInfoPanel from './AppInfoPanel.vue'
 
 import logoUrl from '@/assets/logo.png'
 
+/** 父层提供应用快照、可操作权限及各操作的独立状态；previewUrl 用于判断是否已有可部署预览。 */
 const props = defineProps<{
   app: API.AppVO | null
   title: string
@@ -20,6 +26,7 @@ const props = defineProps<{
   previewUrl: string
 }>()
 
+/** back 导航首页；open-deployed 打开已部署站点；其他事件由页面执行请求和删除确认。 */
 const emit = defineEmits<{
   back: []
   'open-deployed': []
@@ -28,11 +35,14 @@ const emit = defineEmits<{
   delete: []
 }>()
 
+// 点击标题打开 Popover；该状态只影响当前顶部区域，无需提升到页面共享。
 const isInfoOpen = ref(false)
+/** 先收起浮层，再上报删除，避免确认框与应用详情重叠遮挡。 */
 const requestDelete = () => {
   isInfoOpen.value = false
   emit('delete')
 }
+// 路由复用此组件展示另一个应用时，关闭上一应用留下的详情浮层。
 watch(
   () => props.app?.id,
   () => {
@@ -97,6 +107,8 @@ watch(
 </template>
 
 <style scoped>
+/* 顶栏保持品牌区和操作区并排，操作区通过自动左边距固定在可用空间右侧。 */
+
 .chat-header {
   display: flex;
   align-items: center;
@@ -152,6 +164,8 @@ watch(
 .chat-brand__trigger:disabled {
   cursor: default;
 }
+/* 限制长应用名称对按钮的挤压，并保留下拉图标的独立布局空间。 */
+
 .chat-brand__trigger strong {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -222,6 +236,8 @@ watch(
   cursor: not-allowed;
   opacity: 0.45;
 }
+/* 手机下操作区换到单独一行，减少长标题与下载、部署按钮争抢宽度。 */
+
 @media (max-width: 560px) {
   .chat-header {
     padding: 0 14px;

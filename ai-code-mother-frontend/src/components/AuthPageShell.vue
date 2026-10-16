@@ -1,16 +1,27 @@
 <script setup lang="ts">
+/**
+ * 登录/注册共用的展示外壳，不拥有表单数据，也不发起认证请求。
+ * Props 提供左侧品牌介绍与右侧表单标题，form/footer 具名插槽承接调用页的交互内容。
+ * 左侧优先展示 introStatus；未传状态时，才根据 introPoints 渲染能力标签。
+ * headingId 将介绍区与主标题关联，formLabel 为表单所在区域提供可访问名称。
+ */
 import logoUrl from '@/assets/logo.png'
 
+// 内容由登录或注册页单向传入；本组件不修改 Props，也无需向外触发业务事件。
 defineProps<{
+  // 介绍标题的 DOM 标识，需由调用方为当前页面提供。
   headingId: string
   introKicker: string
   introTitle: string
   introDescription: string
+  // 可选的平台状态文案；与能力标签共用同一个展示位置。
   introStatus?: string
+  // 无状态文案时可展示的一组能力标签，数组元素同时用作渲染键。
   introPoints?: string[]
   cardEyebrow: string
   cardTitle: string
   cardDescription: string
+  // 右侧表单区域的无障碍名称，区别于可见的 cardTitle。
   formLabel: string
 }>()
 </script>
@@ -52,6 +63,7 @@ defineProps<{
 </template>
 
 <style scoped>
+/* 桌面采用左右两列：介绍区可伸缩，表单区保留最小宽度；外壳覆盖完整视口高度。 */
 .auth-page-shell {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(420px, 0.9fr);
@@ -69,6 +81,7 @@ defineProps<{
   background: linear-gradient(135deg, #eef6ff 0%, #f9fcff 62%, #fff 100%);
 }
 
+/* 装饰网格绝对定位铺满介绍区，配合模板中的 aria-hidden 避免干扰辅助技术阅读。 */
 .auth-page-shell__grid {
   position: absolute;
   inset: 0;
@@ -80,6 +93,7 @@ defineProps<{
   mask-image: linear-gradient(135deg, black 0%, transparent 72%);
 }
 
+/* 正文抬高层级以覆盖装饰背景，限制阅读宽度而不改变外层网格分栏。 */
 .auth-page-shell__intro-content {
   position: relative;
   z-index: 1;
@@ -170,6 +184,7 @@ defineProps<{
   border-radius: 999px;
 }
 
+/* 表单区域在自身列内居中，内边距随视口伸缩。 */
 .auth-page-shell__panel {
   display: flex;
   align-items: center;
@@ -195,6 +210,7 @@ defineProps<{
   font-size: 14px;
 }
 
+/* 表单位于父页面传入的插槽中，使用深度选择器统一登录和注册的输入、按钮与错误样式。 */
 .auth-page-shell :deep(.auth-form) {
   margin-top: 36px;
 }
@@ -229,6 +245,7 @@ defineProps<{
   color: #a9b6c6;
 }
 
+/* 输入聚焦时保留明确的边框与光晕反馈，替代原生 outline。 */
 .auth-page-shell :deep(.field-input:focus) {
   background: #fff;
   border-color: #4a91e8;
@@ -260,6 +277,7 @@ defineProps<{
   color: #246fc1;
 }
 
+/* 提交期间通过透明度和鼠标指针提示禁用状态，实际交互禁用由模板属性控制。 */
 .auth-page-shell :deep(.field-input:disabled),
 .auth-page-shell :deep(.submit-button:disabled) {
   cursor: not-allowed;
@@ -315,6 +333,7 @@ defineProps<{
   text-decoration: underline;
 }
 
+/* 平板与较窄屏幕转为上下单列，介绍区高度由内容决定，避免挤压表单。 */
 @media (max-width: 900px) {
   .auth-page-shell {
     grid-template-columns: 1fr;
@@ -338,6 +357,7 @@ defineProps<{
   }
 }
 
+/* 手机进一步收紧边距和标题字号，保持表单可读宽度。 */
 @media (max-width: 480px) {
   .auth-page-shell__intro {
     padding: 40px 20px 36px;

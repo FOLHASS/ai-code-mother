@@ -1,9 +1,17 @@
 <script setup lang="ts">
+/**
+ * 首页提示词展示与输入区：仅维护草稿，点击示例会回填草稿，提交事件交由首页进行校验与创建。
+ * isCreating 从父级传入，用于将接口请求状态同步到输入框、发送按钮与按钮内的加载动画。
+ */
 import { ref } from 'vue'
 
+// 组件不直接请求后端，也不自行改变创建状态；异步流程的所有权留在 HomePage。
 defineProps<{ isCreating: boolean }>()
+// 原样向上提交当前草稿，去空白、登录引导和创建失败提示统一由页面处理。
 const emit = defineEmits<{ create: [prompt: string] }>()
+// 草稿只属于此输入区，示例按钮通过 v-model 所绑定的同一个 ref 回填，不会立即发起创建。
 const prompt = ref('')
+// 表单 submit 同时覆盖点击发送和表单提交入口，模板通过 prevent 避免浏览器刷新页面。
 const submit = () => emit('create', prompt.value)
 </script>
 
@@ -41,12 +49,14 @@ const submit = () => emit('create', prompt.value)
 </template>
 
 <style scoped>
+/* Hero 的渐变背景、圆环和伪元素仅负责装饰，正文通过单独层级保持可点击与可阅读。 */
 .hero-section {
   position: relative;
   min-height: 595px;
   overflow: hidden;
   background: linear-gradient(120deg, #f8fdfb 0%, #fbffff 36%, #d5fbf0 64%, #6db8ec 100%);
 }
+/* 透明光斑叠加背景，pointer-events: none 防止装饰层拦截输入与按钮交互。 */
 .hero-section::after {
   position: absolute;
   inset: 0;
@@ -75,6 +85,7 @@ const submit = () => emit('create', prompt.value)
   width: 720px;
   height: 500px;
 }
+/* 内容居中且限制最大宽度；标题字号用 clamp 随视口变化，输入区再限制为更窄的阅读宽度。 */
 .hero-content {
   position: relative;
   z-index: 1;
@@ -117,6 +128,7 @@ const submit = () => emit('create', prompt.value)
   color: #607789;
   font-size: 18px;
 }
+/* 提示词面板负责白底与阴影；textarea 允许垂直调整高度以容纳较长需求。 */
 .prompt-card {
   width: min(100%, 780px);
   margin: 0 auto;
@@ -144,6 +156,7 @@ const submit = () => emit('create', prompt.value)
 .prompt-card textarea::placeholder {
   color: #a1adba;
 }
+/* 输入提示位于左侧、发送按钮位于右侧，创建中通过禁用态和 spinner 表达等待状态。 */
 .prompt-footer {
   display: flex;
   align-items: center;
@@ -184,6 +197,7 @@ const submit = () => emit('create', prompt.value)
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+/* 示例标签按可用宽度自动换行；它们只更新输入文案，不承担异步业务。 */
 .prompt-examples {
   display: flex;
   justify-content: center;
@@ -210,6 +224,7 @@ const submit = () => emit('create', prompt.value)
     transform: rotate(360deg);
   }
 }
+/* 小屏收紧首屏顶部留白并调小标题、副标题，保留原来的输入和示例操作结构。 */
 @media (max-width: 620px) {
   .hero-content {
     padding-top: 52px;

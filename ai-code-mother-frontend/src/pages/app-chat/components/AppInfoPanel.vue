@@ -1,27 +1,37 @@
 <script setup lang="ts">
+/**
+ * 应用标题浮层中的详情展示：复用详情接口 AppVO 及其关联 user 信息，避免再次请求。
+ * 创建者、生成类型、部署状态等字段采用共享格式化函数；删除仅作为有权限时的事件出口。
+ * 底部“查看作品”使用已部署地址，不与 iframe 中的生成文件预览地址混用。
+ */
 import { computed } from 'vue'
 
 import UserAvatar from '@/components/UserAvatar.vue'
 import { formatDateTime, getDeployUrl } from '@/utils/app.ts'
 import { formatCodeGenType } from '@/utils/codeGenTypes.ts'
 
+/** app 为当前应用详情；deployedUrl 优先采用本次部署返回值；canDelete 由父层结合权限和生成状态计算。 */
 const props = defineProps<{
   app: API.AppVO
   deployedUrl: string
   canDelete: boolean
 }>()
 
+/** 只表达删除意图，确认框、调用接口和成功后的导航全部由页面负责。 */
 const emit = defineEmits<{
   delete: []
 }>()
 
+// 作者展示按昵称、账号、未知创作者依次回退，头像组件同步使用同一展示名称。
 const creatorName = computed(
   () => props.app.user?.userName?.trim() || props.app.user?.userAccount?.trim() || '未知创作者',
 )
 
+// 使用统一生成类型枚举的标签；缺失生成类型时保留“尚未生成”的业务含义。
 const generationType = computed(() =>
   props.app.codeGenType ? formatCodeGenType(props.app.codeGenType) : '尚未生成',
 )
+// 已部署地址可能来自刚完成的部署；否则根据应用保存的 deployKey 与全局部署域名生成。
 const workUrl = computed(() => props.deployedUrl || getDeployUrl(props.app))
 </script>
 
@@ -88,6 +98,8 @@ const workUrl = computed(() => props.deployedUrl || getDeployUrl(props.app))
   font-size: 16px;
   font-weight: 700;
 }
+/* 详情采用双列键值布局，单元格允许收缩，长昵称和时间不会撑开浮层。 */
+
 .app-info__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -138,6 +150,8 @@ const workUrl = computed(() => props.deployedUrl || getDeployUrl(props.app))
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 桌面默认隐藏操作，但仍保留网格位置；悬浮或键盘焦点进入时一起展示左右按钮。 */
+
 .app-info__actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -150,6 +164,8 @@ const workUrl = computed(() => props.deployedUrl || getDeployUrl(props.app))
     opacity 160ms ease,
     transform 160ms ease;
 }
+/* focus-within 使键盘导航获得与鼠标悬浮一致的操作可见性。 */
+
 .app-info:hover .app-info__actions,
 .app-info:focus-within .app-info__actions {
   opacity: 1;
@@ -200,6 +216,8 @@ const workUrl = computed(() => props.deployedUrl || getDeployUrl(props.app))
   background: #fff0f1;
   border-color: #efb5bc;
 }
+/* 无悬浮能力的触屏直接显示操作，避免按钮无法被发现或点击。 */
+
 @media (hover: none) {
   .app-info__actions {
     opacity: 1;
@@ -207,6 +225,8 @@ const workUrl = computed(() => props.deployedUrl || getDeployUrl(props.app))
     transform: none;
   }
 }
+/* 尊重系统减少动态效果的偏好，取消操作区淡入和位移动画。 */
+
 @media (prefers-reduced-motion: reduce) {
   .app-info__actions,
   .app-info__actions a,

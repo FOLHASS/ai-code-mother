@@ -1,4 +1,11 @@
 <script setup lang="ts">
+/**
+ * 用户管理页面负责组装搜索面板、数据表格和创建/编辑弹窗，不直接维护请求细节。
+ * useUserList 是查询条件、分页、列表和管理员显示状态的唯一所有者。
+ * useUserMutations 接收列表引用、页码和刷新方法，负责增删改、确认框及弹窗开关。
+ * 搜索、分页、编辑、删除由子组件 Emits 回传；表单提交成功后由组合函数刷新列表。
+ * 模板的 isAdmin 控制页面展示，路由守卫与后端管理员校验共同约束真实访问权限。
+ */
 import { onMounted } from 'vue'
 
 import PageHeader from '@/components/PageHeader.vue'
@@ -9,12 +16,15 @@ import UserFormModal from './user-manage/components/UserFormModal.vue'
 import { useUserList } from './user-manage/composables/useUserList.ts'
 import { useUserMutations } from './user-manage/composables/useUserMutations.ts'
 
+// 列表状态直接传给搜索和表格；加载动作共享同一份已应用查询条件。
 const { isAdmin, isLoading, currentPage, pageSize, totalUsers, users,
   loadUsers, handleSearch, handleReset, handlePageChange } = useUserList()
+// 两个 UserFormModal 实例复用同一表单实现，通过 mode 和不同加载状态区分创建与编辑。
 const { isSaving, isDeleting, isCreating, showCreateModal, showEditModal, selectedUser,
   openEditModal, openCreateModal, closeCreateModal, handleCreateUser,
   closeEditModal, handleSaveUser, handleDeleteUser } = useUserMutations({ users, currentPage, loadUsers })
 
+// 页面挂载加载首屏；权限不满足时由列表组合函数返回首页。
 onMounted(() => {
   void loadUsers()
 })
@@ -65,12 +75,14 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* 管理页宽度与其他后台页面一致，保留居中边距。 */
 .user-manage-page {
   width: min(1280px, calc(100% - 48px));
   margin: 0 auto;
   color: #1f2d3d;
 }
 
+/* 页头把用户统计与创建入口横向排布。 */
 .header-actions {
   display: flex;
   align-items: center;
@@ -113,6 +125,7 @@ button:disabled {
   opacity: 0.55;
 }
 
+/* 窄屏将页头操作上下排列，使创建按钮与统计文案保有独立空间。 */
 @media (max-width: 700px) {
   .header-actions {
     align-items: flex-end;

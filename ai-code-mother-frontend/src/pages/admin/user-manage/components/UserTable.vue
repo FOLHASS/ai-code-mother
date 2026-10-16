@@ -1,11 +1,22 @@
 <script setup lang="ts">
+/**
+ * 只读用户表格与分页区域：所有数据、页码和加载态都由父级提供。
+ * 编辑、删除和翻页均通过 Emits 发出，不在表格中请求接口或直接改动列表。
+ * 列定义统一驱动表头与单元格；内容区按列键选择头像、文本、角色和操作按钮的渲染方式。
+ * 加载中、空列表和正常记录互斥展示，分页在总数超过单页容量时出现。
+ */
 import UserAvatar from '@/components/UserAvatar.vue'
 import { formatDateTime } from '@/utils/app.ts'
 
+// 角色键仅用于显示映射；表格不以文案或样式承担权限验证。
 type UserRole = 'user' | 'admin' | 'ban'
+// 列键使用字面量联合，防止列配置与模板分支使用不同拼写。
 type UserTableColumnKey =
   'id' | 'user' | 'userAccount' | 'userProfile' | 'userRole' | 'createTime' | 'actions'
 
+/**
+ * 表格列的展示配置：className 应用于表头，cellClassName 应用于对应数据单元格。
+ */
 type UserTableColumn = {
   key: UserTableColumnKey
   title: string
@@ -13,14 +24,18 @@ type UserTableColumn = {
   cellClassName?: string
 }
 
+// 列表和分页为单向数据流；isDeleting 控制所有删除按钮，避免同一删除流程中重复操作。
 defineProps<{
   users: API.UserVO[]
+  // 后端返回的总记录数，用于统计、分页显示和下一页是否可用的判断。
   totalUsers: number
   isLoading: boolean
   isDeleting: boolean
+  // 从 1 开始的当前页，页码修改交由父级处理。
   currentPage: number
   pageSize: number
 }>()
+// 操作事件携带完整用户对象以便回填或确认；分页事件仅携带目标页码。
 const emit = defineEmits<{
   edit: [user: API.UserVO]
   delete: [user: API.UserVO]
@@ -33,6 +48,7 @@ const roleLabels: Record<UserRole, string> = {
   ban: '已封禁',
 }
 
+// 表头与每一行按同一列数组顺序渲染；加载与空态的 colspan 同样使用列数。
 const userTableColumns: UserTableColumn[] = [
   { key: 'id', title: 'ID', cellClassName: 'id-cell' },
   { key: 'user', title: '用户' },
@@ -48,10 +64,16 @@ const userTableColumns: UserTableColumn[] = [
   },
 ]
 
+/**
+ * 将已知角色转成中文；缺少或未识别的角色返回“未知角色”，便于管理时发现异常数据。
+ */
 const formatRole = (role?: string) => {
   return role && role in roleLabels ? roleLabels[role as UserRole] : '未知角色'
 }
 
+/**
+ * 把接口时间交给共享日期工具格式化，缺省值沿用工具默认占位。
+ */
 const formatDate = (date?: string) => {
   return formatDateTime(date)
 }
@@ -173,6 +195,7 @@ p {
   box-shadow: 0 8px 24px rgb(42 92 145 / 5%);
 }
 
+/* 操作区与分页区共享右对齐布局；前后页按钮状态由模板根据页码、总数和加载态判断。 */
 .action-buttons,
 .pagination {
   display: flex;
@@ -231,10 +254,12 @@ button:disabled {
   color: #5d8fca;
 }
 
+/* 表格在窄视口允许横向滚动，保留各列的可读宽度而不挤压字段。 */
 .table-wrap {
   overflow-x: auto;
 }
 
+/* 表格最小宽度用于承载七列管理信息，溢出由外层滚动容器处理。 */
 table {
   width: 100%;
   min-width: 980px;
@@ -278,6 +303,7 @@ td {
   font-weight: 600;
 }
 
+/* 简介过长时单行省略，避免单条记录拉宽表格。 */
 .profile-cell {
   max-width: 220px;
   overflow: hidden;
@@ -285,6 +311,7 @@ td {
   white-space: nowrap;
 }
 
+/* 角色徽标共享基础形状，具体角色类只负责颜色区分。 */
 .role-badge {
   display: inline-flex;
   padding: 4px 8px;
@@ -312,6 +339,7 @@ td {
   background: #f1f3f5;
 }
 
+/* 编辑与删除保持同一行，避免操作列因文字换行变得难以点击。 */
 .action-column {
   white-space: nowrap;
 }
@@ -354,6 +382,7 @@ td {
   font-size: 13px;
 }
 
+/* 窄屏隐藏辅助权限提示，优先为统计标题和表格操作保留空间。 */
 @media (max-width: 700px) {
   .table-toolbar {
     align-items: flex-start;

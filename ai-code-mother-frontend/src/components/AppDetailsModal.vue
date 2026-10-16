@@ -1,20 +1,29 @@
 <script setup lang="ts">
+/**
+ * 应用详情展示弹窗：直接消费父级传入的 VO，展示概览、元数据、初始需求及三个底部操作。
+ * 不在弹窗内部加载数据或判断权限；父级管理详情来源以及查看、编辑的实际处理方式。
+ */
 import { Modal } from 'ant-design-vue'
 
 import AppCover from '@/components/AppCover.vue'
 import { formatDate } from '@/utils/app.ts'
 import { formatCodeGenType } from '@/utils/codeGenTypes.ts'
 
+// open 配合父级 v-model 管理显隐；没有 app 时不渲染详情主体，避免读取空对象字段。
 defineProps<{
   open: boolean
   app: API.AppVO | null
 }>()
 
+// 关闭只更新 open；查看与编辑携带当前 app，由父级决定路由或弹窗，不复制导航逻辑。
 const emit = defineEmits<{
   'update:open': [open: boolean]
   openApp: [app: API.AppVO]
   editApp: [app: API.AppVO]
 }>()
+// 模板按封面/作者概览 → 双列元数据 → 保留换行的初始需求 → 操作区排列。
+// priority === 99 同时控制精选封面配色与徽标；deployKey 的存在仅用于展示部署状态。
+// codeGenType 与时间继续复用公共格式化函数，不直接将接口枚举值作为最终展示名称。
 </script>
 
 <template>
@@ -61,6 +70,7 @@ const emit = defineEmits<{
   color: #334c5e;
 }
 
+/* 概览横向并排封面与应用身份，封面尺寸由 AppCover 的 modal 模式统一管理。 */
 .app-details__overview {
   display: flex;
   align-items: center;
@@ -88,6 +98,7 @@ const emit = defineEmits<{
   border-radius: 999px;
 }
 
+/* 元数据采用两列栅格，每项内部标签与值左右分布，支持较短信息快速对照。 */
 .app-details__meta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -125,6 +136,7 @@ const emit = defineEmits<{
   font-weight: 600;
 }
 
+/* 初始需求使用 pre-wrap 保留用户换行，仍允许长段落按弹窗宽度正常折行。 */
 .app-details__prompt p {
   margin: 8px 0 0;
   color: #526975;
@@ -133,6 +145,7 @@ const emit = defineEmits<{
   white-space: pre-wrap;
 }
 
+/* 操作区靠右排列，通过主色按钮突出查看入口，其余操作保持次级按钮样式。 */
 .app-details__actions {
   display: flex;
   justify-content: flex-end;
@@ -158,6 +171,7 @@ const emit = defineEmits<{
   border-color: #248f83;
 }
 
+/* 窄屏概览改竖向，元数据改为一列，底部按钮允许换行以避免水平溢出。 */
 @media (max-width: 560px) {
   .app-details__overview {
     align-items: flex-start;

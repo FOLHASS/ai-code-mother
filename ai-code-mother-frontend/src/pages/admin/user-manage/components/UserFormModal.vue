@@ -1,12 +1,20 @@
 <script setup lang="ts">
+/**
+ * 创建与编辑用户共用的表单弹窗：本地维护草稿，Props 决定模式、开关、加载态和待编辑用户。
+ * 窗口打开时回填或重置草稿；提交只触发 submit，取消只触发 close，请求和关闭策略由父级负责。
+ * 创建模式展示账号字段及认证配置说明；编辑模式携带用户 ID，并不允许修改账号。
+ */
 import { reactive, watch } from 'vue'
 import { Modal } from 'ant-design-vue'
 
+// 复用生成接口类型的交集，覆盖创建与编辑两个模式需要的字段集合。
 type UserForm = API.UserAddRequest & API.UserUpdateRequest
 
+// 父级拥有弹窗开关与提交状态，user 缺省为空，组件不会直接修改任何 Props。
 const props = withDefaults(
   defineProps<{
     open: boolean
+    // mode 同时决定标题、确认文案、回填方式和提交字段。
     mode: 'create' | 'edit'
     loading: boolean
     user?: API.UserVO | null
@@ -14,11 +22,13 @@ const props = withDefaults(
   { user: null },
 )
 
+// close 由父级决定是否允许关闭；submit 发送整理后的表单数据交给 CRUD 组合函数。
 const emit = defineEmits<{
   close: []
   submit: [form: UserForm]
 }>()
 
+// 独立草稿隔离输入与列表对象，取消编辑时不会把尚未保存的值写回表格。
 const form = reactive<UserForm>({
   userAccount: '',
   userName: '',
@@ -27,6 +37,11 @@ const form = reactive<UserForm>({
   userRole: 'user',
 })
 
+/**
+ * 同时监听打开状态和选中用户引用；仅打开时更新表单，immediate 兼容初始就打开的场景。
+ * 创建模式清空 ID 与资料并默认普通用户；编辑模式只拷贝接口允许修改的字段。
+ * 这里只负责回填，必填校验与后端提交由父级提供的处理方法执行。
+ */
 watch(
   [() => props.open, () => props.user],
   ([open]) => {
@@ -54,6 +69,10 @@ watch(
   { immediate: true },
 )
 
+/**
+ * 按模式显式组装提交字段，避免旧草稿中与当前模式无关的数据泄漏到请求。
+ * 创建发送账号及资料；编辑发送 ID 及资料，不发送账号；本方法不直接关闭窗口。
+ */
 const submit = () => {
   if (props.mode === 'create') {
     emit('submit', {
@@ -130,6 +149,7 @@ const submit = () => {
   font-weight: 600;
 }
 
+/* 弹窗中的输入、角色选择和简介统一尺寸与边框，保留各原生控件自身的输入语义。 */
 .field-item input,
 .field-item select,
 .field-item textarea {
@@ -160,6 +180,7 @@ const submit = () => {
   box-shadow: 0 0 0 3px rgb(74 145 232 / 11%);
 }
 
+/* 字段按纵向网格排列，弹窗宽度由 Ant Design Vue Modal 管理。 */
 .edit-form {
   display: grid;
   gap: 16px;
@@ -173,6 +194,7 @@ const submit = () => {
   font-weight: 400;
 }
 
+/* 创建模式底部的辅助说明单独降低视觉权重，与表单字段保持间距。 */
 .form-tip {
   margin: -4px 0 0;
   color: #8b99aa;

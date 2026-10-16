@@ -1,8 +1,16 @@
 <script setup lang="ts">
+/**
+ * 用户搜索面板：持有未提交的筛选草稿，只通过 search/reset 事件通知页面。
+ * 父级持有真正生效的查询条件和请求状态；修改输入不会立即请求，点击查询才提交草稿副本。
+ * 模板按 ID、昵称、账号、简介和角色展示字段，布局在不同断点逐步减少列数。
+ */
 import { reactive } from 'vue'
 
+// 加载态由父级传入，用于查询按钮的文案与禁用反馈。
 defineProps<{ isLoading: boolean }>()
+// search 携带完整筛选草稿，reset 无参数，通知父级清空已应用条件并重新查询。
 const emit = defineEmits<{ search: [query: API.UserQueryRequest]; reset: [] }>()
+// 本地草稿与父级 appliedQuery 相互独立，避免输入过程中影响当前分页结果。
 const draftQuery = reactive<API.UserQueryRequest>({
   id: undefined,
   userName: '',
@@ -10,7 +18,12 @@ const draftQuery = reactive<API.UserQueryRequest>({
   userProfile: '',
   userRole: undefined,
 })
+// 发送浅拷贝，父级应用查询条件时不会继续引用本组件的响应式草稿对象。
 const search = () => emit('search', { ...draftQuery })
+/**
+ * 先将输入恢复为空条件，再通知父级执行对应的查询状态重置。
+ * 角色使用 undefined 表示“全部角色”，与具体角色字符串区分。
+ */
 const reset = () => {
   Object.assign(draftQuery, {
     id: undefined,
@@ -62,6 +75,7 @@ const reset = () => {
 </template>
 
 <style scoped>
+/* 查询区域沿用后台卡片样式，与下方表格分离成独立视觉模块。 */
 .query-panel {
   background: #fff;
   border: 1px solid #e4edf6;
@@ -77,6 +91,7 @@ const reset = () => {
   padding: 20px;
 }
 
+/* 宽屏五个条件横向排列，每列具有最小宽度，操作按钮保持独立宽度。 */
 .query-grid {
   display: grid;
   flex: 1;
@@ -180,6 +195,7 @@ button:disabled {
   font-weight: 400;
 }
 
+/* 中等屏幕条件改三列，并将操作区移至下一行右侧。 */
 @media (max-width: 1100px) {
   .query-panel {
     display: block;
@@ -195,12 +211,14 @@ button:disabled {
   }
 }
 
+/* 较窄屏幕使用两列输入，minmax(0, 1fr) 允许字段随容器收缩。 */
 @media (max-width: 700px) {
   .query-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
+/* 手机条件逐项纵向排列，重置与查询按钮均分一行。 */
 @media (max-width: 480px) {
   .query-grid {
     grid-template-columns: 1fr;

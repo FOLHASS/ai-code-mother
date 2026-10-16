@@ -1,14 +1,20 @@
 <script lang="ts" setup>
+/**
+ * 应用对话页的布局入口：连接顶部应用操作、左侧对话、右侧预览三个业务区域。
+ * 会话状态、历史加载、流式生成及可视化编辑由 useAppChat 协调；此处只组装组件与删除确认流程。
+ * 子组件通过事件上报操作，页面再调用组合式函数，避免展示组件直接依赖路由或接口。
+ */
 import { message, Modal } from 'ant-design-vue'
 
-import { deleteApp } from '@/api/appController.ts'
+import { deleteApp } from '@/modules/app-management/api/appApi.ts'
+import ChatConversationPanel from '@/modules/ai-chat/components/ChatConversationPanel.vue'
 import { asApiLongId } from '@/utils/id.ts'
 
 import AppChatHeader from './app-chat/components/AppChatHeader.vue'
-import AppConversationPanel from './app-chat/components/AppConversationPanel.vue'
 import AppPreviewPanel from './app-chat/components/AppPreviewPanel.vue'
-import { useAppChat } from './app-chat/composables/useAppChat.ts'
+import { useAppChatSession } from '@/modules/app-workbench/composables/useAppChatSession.ts'
 
+// 从同一个会话实例取得响应式状态；模板自动解包 ref，所有区域共享一致的应用与生成状态。
 const {
   router,
   app,
@@ -45,8 +51,13 @@ const {
   handleDeploy,
   handleDownload,
   openDeployUrl,
-} = useAppChat()
+} = useAppChatSession()
 
+/**
+ * 仅应用创建者且当前未生成时允许发起删除；确认框中快照保存 ID 与名称。
+ * 接口成功后用 replace 返回首页，防止浏览器后退再次进入已删除应用。
+ * 确认框负责等待异步 onOk；业务失败和网络失败分别使用现有提示。
+ */
 const removeApp = () => {
   if (!app.value?.id || !canInteract.value || isStreaming.value) return
   const appId = String(app.value.id)
@@ -58,6 +69,7 @@ const removeApp = () => {
     cancelText: '取消',
     okButtonProps: { danger: true },
     onOk: async () => {
+      // 只在用户确认后发请求，雪花 ID 转换由专用适配器保留原字符串精度。
       try {
         const response = await deleteApp({ id: asApiLongId(appId) })
         if (response.data.code !== 0 || !response.data.data) {
@@ -95,7 +107,7 @@ const removeApp = () => {
     />
 
     <div class="chat-workspace">
-      <AppConversationPanel
+      <ChatConversationPanel
         v-model="input"
         :messages="messages"
         :is-loading-app="isLoadingApp"
@@ -135,6 +147,7 @@ const removeApp = () => {
 </template>
 
 <style scoped>
+/* 页面占满视口并禁止外层滚动；桌面下两个面板分别管理自己的可滚动内容。 */
 .chat-page {
   display: flex;
   flex-direction: column;
@@ -144,6 +157,7 @@ const removeApp = () => {
   color: #20364f;
   background: #f6f9fb;
 }
+/* minmax 与 min-height: 0 允许内容收缩，避免长消息或 iframe 将整个页面撑高。 */
 .chat-workspace {
   display: grid;
   flex: 1;
@@ -164,6 +178,7 @@ const removeApp = () => {
   border-radius: 14px;
   box-shadow: 0 10px 30px rgb(34 77 99 / 4%);
 }
+/* 窄屏改为上下排列，工作区承担整体滚动，并保留每个面板的最小可用高度。 */
 @media (max-width: 900px) {
   .chat-workspace {
     grid-template-columns: 1fr;

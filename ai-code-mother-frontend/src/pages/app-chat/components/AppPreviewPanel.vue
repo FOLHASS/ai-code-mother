@@ -1,6 +1,12 @@
 <script setup lang="ts">
+/**
+ * 右侧预览展示组件：根据父层的就绪检测展示 iframe 或加载/错误空态。
+ * 刷新事件只交给父层重新检查 URL，本组件不自行请求静态页面或改变生成状态。
+ * iframe-ready 把真实 DOM 句柄交给可视化编辑器，并在销毁时传 null 释放绑定。
+ */
 import { onBeforeUnmount, ref, watch } from 'vue'
 
+/** codeGenType 来自后端展示；预览是否出现同时依赖就绪标志和 URL，编辑状态仅影响状态提示。 */
 defineProps<{
   codeGenType?: string
   hasApp: boolean
@@ -11,12 +17,16 @@ defineProps<{
   isEditMode: boolean
 }>()
 
+/** refresh 请求重新检查预览；iframe-ready 反映条件渲染后的真实 iframe 实例和卸载时机。 */
 const emit = defineEmits<{
   refresh: []
   'iframe-ready': [iframe: HTMLIFrameElement | null]
 }>()
+// 使用模板 ref 观察 iframe 的建立/移除；预览错误或应用切换同样可能使其变为 null。
 const previewIframe = ref<HTMLIFrameElement | null>(null)
+// 等 DOM 更新完成后通知编辑器，避免父层拿到尚未挂载的 iframe；前置卸载钩子负责及时解绑。
 watch(previewIframe, (iframe) => emit('iframe-ready', iframe), { flush: 'post' })
+// 模板保留 allow-same-origin 供同源选择器访问，allow-scripts 供生成页面运行；跨源页仍无法启用编辑。
 onBeforeUnmount(() => emit('iframe-ready', null))
 </script>
 
@@ -137,6 +147,8 @@ onBeforeUnmount(() => emit('iframe-ready', null))
 .preview-panel {
   padding-bottom: 18px;
 }
+/* 浏览器外框为列式弹性布局，工具栏占固定高度，iframe 占据其余可用空间。 */
+
 .browser-frame {
   display: flex;
   flex: 1;
@@ -198,6 +210,8 @@ onBeforeUnmount(() => emit('iframe-ready', null))
 .browser-refresh:disabled {
   cursor: not-allowed;
 }
+/* 允许内部内容在父级限制下收缩，防止 iframe 默认尺寸改变双栏布局。 */
+
 .browser-content {
   position: relative;
   flex: 1;
@@ -210,6 +224,8 @@ onBeforeUnmount(() => emit('iframe-ready', null))
   min-height: 0;
   border: 0;
 }
+/* 没有可用预览时复用同一区域的空态，区分生成进行中和真实预览检测失败。 */
+
 .preview-empty {
   display: flex;
   flex-direction: column;
@@ -265,6 +281,8 @@ onBeforeUnmount(() => emit('iframe-ready', null))
 .preview-footnote p {
   margin: 0;
 }
+/* 三个圆点使用同一动画并错开延迟，表达生成阶段的进行状态。 */
+
 @keyframes preview-pulse {
   0%,
   100% {

@@ -1,21 +1,31 @@
 <script setup lang="ts">
+/**
+ * 只读用户摘要：接收登录用户资料，展示头像、名称、账号、角色以及时间字段。
+ * 父页面负责提供 user，编辑表单保存后通过同一 store 驱动这里更新；本组件没有保存或请求行为。
+ * 名称、角色文案和日期均通过派生值或格式化函数处理，模板专注展示。
+ */
 import { computed } from 'vue'
 
 import UserAvatar from '@/components/UserAvatar.vue'
 import { formatDateTime } from '@/utils/app.ts'
 
+// 本地类型对应已支持的角色文案键；未知或缺少角色在摘要中回退为普通用户。
 type UserRole = 'user' | 'admin' | 'ban'
+// 用户资料由父页面传入，组件不修改 Props。
 const props = defineProps<{ user: API.LoginUserVO }>()
 const roleLabels: Record<UserRole, string> = {
   user: '普通用户',
   admin: '管理员',
   ban: '已封禁',
 }
+// 名称依次取昵称、账号和通用占位，确保头像与标题使用同一个显示名。
 const displayName = computed(() => props.user.userName || props.user.userAccount || '用户')
+// 角色映射只影响文案展示，不承担管理员权限判断。
 const roleLabel = computed(() => {
   const role = props.user.userRole
   return role && role in roleLabels ? roleLabels[role as UserRole] : '普通用户'
 })
+// 复用公共时间格式化；缺少日期时在资料摘要中展示“暂无记录”。
 const formatDate = (date?: string) => formatDateTime(date, '暂无记录')
 </script>
 
@@ -51,6 +61,7 @@ p {
   margin-top: 0;
 }
 
+/* 摘要卡片的边框、圆角和阴影与右侧资料表单保持一致。 */
 .profile-summary {
   background: #fff;
   border: 1px solid #e4edf6;
@@ -79,6 +90,7 @@ p {
   font-size: 13px;
 }
 
+/* 角色徽标的基础形状共用，颜色由 role-user、role-admin、role-ban 类区分。 */
 .role-badge {
   display: inline-flex;
   padding: 4px 9px;
@@ -106,6 +118,7 @@ p {
   text-align: left;
 }
 
+/* 每项详情使用名称和值两端对齐，日期与 ID 保持独立阅读位置。 */
 .summary-list div {
   display: flex;
   justify-content: space-between;
@@ -126,6 +139,7 @@ p {
   text-align: right;
 }
 
+/* 窄屏摘要变成头像与文本并排，详细资料占满下一行，适应页面单列布局。 */
 @media (max-width: 760px) {
   .profile-summary {
     display: grid;

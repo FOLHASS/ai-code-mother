@@ -11,6 +11,7 @@ import com.xy.aicodemother.constant.AppConstant;
 import com.xy.aicodemother.ai.tools.ProjectBuildService;
 import com.xy.aicodemother.core.AiCodeGeneratorFacade;
 import com.xy.aicodemother.core.builder.VueProjectBuilder;
+import com.xy.aicodemother.core.handler.JsonMessageStreamHandler;
 import com.xy.aicodemother.core.handler.StreamHandlerExecutor;
 import com.xy.aicodemother.exception.BusinessException;
 import com.xy.aicodemother.exception.ErrorCode;
@@ -33,6 +34,7 @@ import com.xy.aicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -79,6 +81,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private ProjectBuildService projectBuildService;
     @Resource
     private ScreenshotService screenshotService;
+    @Autowired
+    private JsonMessageStreamHandler jsonMessageStreamHandler;
 
 
     @Override
@@ -107,6 +111,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
          * 1. 前两部同上
          * 2. 增加核心逻辑： 根据AI不同的响应结果实现给前端不同的展示逻辑
          */
+
         return streamHandlerExecutor.doExecute(codeStream, chatHistoryService, appId, loginUser, codeGenType);
 
     }
