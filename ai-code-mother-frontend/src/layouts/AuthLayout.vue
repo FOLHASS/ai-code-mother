@@ -4,10 +4,12 @@
  * 页面内部的品牌说明与表单样式由 AuthPageShell 和具体认证页面负责。
  */
 import { Layout } from 'ant-design-vue'
+import SessionStatusNotice from './components/SessionStatusNotice.vue'
 </script>
 
 <template>
   <Layout class="auth-layout">
+    <SessionStatusNotice />
     <RouterView />
   </Layout>
 </template>

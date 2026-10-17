@@ -26,7 +26,7 @@ defineProps<{
 }
 
 .page-stat strong {
-  color: #2679d9;
+  color: var(--color-brand);
   font-size: 28px;
   line-height: 1.1;
 }

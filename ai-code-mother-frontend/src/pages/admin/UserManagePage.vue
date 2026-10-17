@@ -1,43 +1,59 @@
 <script setup lang="ts">
 /**
  * 用户管理页面负责组装搜索面板、数据表格和创建/编辑弹窗，不直接维护请求细节。
- * useUserList 是查询条件、分页、列表和管理员显示状态的唯一所有者。
- * useUserMutations 接收列表引用、页码和刷新方法，负责增删改、确认框及弹窗开关。
- * 搜索、分页、编辑、删除由子组件 Emits 回传；表单提交成功后由组合函数刷新列表。
+ * UserListController 是查询条件、分页、列表和管理员显示状态的唯一所有者。
+ * UserMutationsController 接收列表引用、页码和刷新方法，负责增删改、确认框及弹窗开关。
+ * 搜索、分页、编辑、删除由子组件 Emits 回传；表单提交成功后由控制器刷新列表。
  * 模板的 isAdmin 控制页面展示，路由守卫与后端管理员校验共同约束真实访问权限。
  */
-import { onMounted } from 'vue'
-
+import { useUserListController, useUserMutationsController } from '@/app/controllers.ts'
 import PageHeader from '@/components/PageHeader.vue'
 import PageStat from '@/components/PageStat.vue'
-import UserSearchPanel from './user-manage/components/UserSearchPanel.vue'
-import UserTable from './user-manage/components/UserTable.vue'
-import UserFormModal from './user-manage/components/UserFormModal.vue'
-import { useUserList } from './user-manage/composables/useUserList.ts'
-import { useUserMutations } from './user-manage/composables/useUserMutations.ts'
+import { UserSearchPanel } from '@/features/user-management/components'
+import { UserTable } from '@/features/user-management/components'
+import { UserFormModal } from '@/features/user-management/components'
 
 // 列表状态直接传给搜索和表格；加载动作共享同一份已应用查询条件。
-const { isAdmin, isLoading, currentPage, pageSize, totalUsers, users,
-  loadUsers, handleSearch, handleReset, handlePageChange } = useUserList()
+const listController = useUserListController()
+const {
+  isAdmin,
+  isLoading,
+  currentPage,
+  pageSize,
+  totalUsers,
+  users,
+  handleSearch,
+  handleReset,
+  handlePageChange,
+} = listController
 // 两个 UserFormModal 实例复用同一表单实现，通过 mode 和不同加载状态区分创建与编辑。
-const { isSaving, isDeleting, isCreating, showCreateModal, showEditModal, selectedUser,
-  openEditModal, openCreateModal, closeCreateModal, handleCreateUser,
-  closeEditModal, handleSaveUser, handleDeleteUser } = useUserMutations({ users, currentPage, loadUsers })
-
-// 页面挂载加载首屏；权限不满足时由列表组合函数返回首页。
-onMounted(() => {
-  void loadUsers()
-})
-</script><template>
+const mutationsController = useUserMutationsController(listController)
+const {
+  isSaving,
+  isDeleting,
+  isCreating,
+  showCreateModal,
+  showEditModal,
+  selectedUser,
+  openEditModal,
+  openCreateModal,
+  closeCreateModal,
+  handleCreateUser,
+  closeEditModal,
+  handleSaveUser,
+  handleDeleteUser,
+} = mutationsController
+</script>
+<template>
   <section v-if="isAdmin" class="user-manage-page">
     <PageHeader eyebrow="ADMIN CONSOLE" title="用户管理" description="集中查看和维护平台用户信息。">
       <template #actions>
         <div class="header-actions">
           <PageStat :value="totalUsers" label="用户总数" />
-        <button class="primary-button create-button" type="button" @click="openCreateModal">
-          <span aria-hidden="true">＋</span>
-          创建用户
-        </button>
+          <button class="primary-button create-button" type="button" @click="openCreateModal">
+            <span aria-hidden="true">＋</span>
+            创建用户
+          </button>
         </div>
       </template>
     </PageHeader>
@@ -112,8 +128,8 @@ onMounted(() => {
 
 .primary-button {
   color: #fff;
-  background: #2679d9;
-  border: 1px solid #2679d9;
+  background: var(--color-brand);
+  border: 1px solid var(--color-brand);
 }
 
 .primary-button:hover:not(:disabled) {
@@ -132,4 +148,5 @@ button:disabled {
     flex-direction: column-reverse;
     gap: 12px;
   }
-}</style>
+}
+</style>

@@ -1,20 +1,17 @@
 <script lang="ts" setup>
 /**
  * 应用对话页的布局入口：连接顶部应用操作、左侧对话、右侧预览三个业务区域。
- * 会话状态、历史加载、流式生成及可视化编辑由 useAppChat 协调；此处只组装组件与删除确认流程。
- * 子组件通过事件上报操作，页面再调用组合式函数，避免展示组件直接依赖路由或接口。
+ * 会话和删除操作由类控制器与服务负责；此处只组装组件并绑定它们公开的状态与命令。
+ * 子组件通过事件上报操作，展示组件不直接依赖路由或接口。
  */
-import { message, Modal } from 'ant-design-vue'
+import { useAppChatSession } from '@/app/controllers.ts'
+import { ChatConversationPanel } from '@/features/ai-chat/components'
 
-import { deleteApp } from '@/modules/app-management/api/appApi.ts'
-import ChatConversationPanel from '@/modules/ai-chat/components/ChatConversationPanel.vue'
-import { asApiLongId } from '@/utils/id.ts'
-
-import AppChatHeader from './app-chat/components/AppChatHeader.vue'
-import AppPreviewPanel from './app-chat/components/AppPreviewPanel.vue'
-import { useAppChatSession } from '@/modules/app-workbench/composables/useAppChatSession.ts'
+import { AppChatHeader } from '@/features/app-workbench/components'
+import { AppPreviewPanel } from '@/features/app-workbench/components'
 
 // 从同一个会话实例取得响应式状态；模板自动解包 ref，所有区域共享一致的应用与生成状态。
+const session = useAppChatSession()
 const {
   router,
   app,
@@ -51,39 +48,8 @@ const {
   handleDeploy,
   handleDownload,
   openDeployUrl,
-} = useAppChatSession()
-
-/**
- * 仅应用创建者且当前未生成时允许发起删除；确认框中快照保存 ID 与名称。
- * 接口成功后用 replace 返回首页，防止浏览器后退再次进入已删除应用。
- * 确认框负责等待异步 onOk；业务失败和网络失败分别使用现有提示。
- */
-const removeApp = () => {
-  if (!app.value?.id || !canInteract.value || isStreaming.value) return
-  const appId = String(app.value.id)
-  const appName = app.value.appName || '未命名应用'
-  Modal.confirm({
-    title: '删除这个应用？',
-    content: `删除后将无法恢复“${appName}”。`,
-    okText: '确认删除',
-    cancelText: '取消',
-    okButtonProps: { danger: true },
-    onOk: async () => {
-      // 只在用户确认后发请求，雪花 ID 转换由专用适配器保留原字符串精度。
-      try {
-        const response = await deleteApp({ id: asApiLongId(appId) })
-        if (response.data.code !== 0 || !response.data.data) {
-          message.error(response.data.message || '应用删除失败')
-          return
-        }
-        message.success('应用已删除')
-        await router.replace('/')
-      } catch {
-        message.error('网络异常，应用删除失败')
-      }
-    },
-  })
-}
+} = session
+const removeApp = session.removeApp
 </script>
 
 <template>

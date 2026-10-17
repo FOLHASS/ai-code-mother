@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { USER_ROLE } from '@/shared/domain/constants.ts'
 /**
  * 普通业务路由的布局层：决定站点导航、页面留白与对话工作区的呈现方式。
  * 菜单定义与权限展示集中在这里，GlobalHeader 接收菜单并回传选择事件。
@@ -6,10 +7,11 @@
  */
 import { computed } from 'vue'
 import { Layout } from 'ant-design-vue'
+import SessionStatusNotice from './components/SessionStatusNotice.vue'
 import type { MenuProps } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import GlobalHeader from '@/components/GlobalHeader.vue'
+import GlobalHeader from '@/layouts/components/GlobalHeader.vue'
 import { useLoginUserStore } from '@/stores/loginUserStore.ts'
 
 const router = useRouter()
@@ -22,7 +24,7 @@ const showGlobalChrome = computed(() => route.name !== 'AppChatPage')
 // 使用 computed 使登录用户角色更新后菜单立即同步；隐藏入口不替代服务端权限校验。
 const menuItems = computed<MenuProps['items']>(() => [
   { key: '/', label: '首页' },
-  ...(loginUserStore.loginUser.userRole === 'admin'
+  ...(loginUserStore.loginUser.userRole === USER_ROLE.ADMIN
     ? [
         { key: '/admin/appManage', label: '应用管理' },
         { key: '/admin/chatHistoryManage', label: '对话管理' },
@@ -42,11 +44,11 @@ const handleMenuSelect = (key: string) => {
     <GlobalHeader v-if="showGlobalChrome" :menu-items="menuItems" @select="handleMenuSelect" />
 
     <Layout.Content class="basic-content">
+      <SessionStatusNotice />
       <main class="content-container" :class="{ 'workspace-container': !showGlobalChrome }">
         <RouterView />
       </main>
     </Layout.Content>
-
   </Layout>
 </template>
 

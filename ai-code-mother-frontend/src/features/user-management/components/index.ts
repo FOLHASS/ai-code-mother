@@ -1,0 +1,5 @@
+export { default as ProfileEditor } from './ProfileEditor.vue'
+export { default as ProfileSummary } from './ProfileSummary.vue'
+export { default as UserFormModal } from './UserFormModal.vue'
+export { default as UserSearchPanel } from './UserSearchPanel.vue'
+export { default as UserTable } from './UserTable.vue'

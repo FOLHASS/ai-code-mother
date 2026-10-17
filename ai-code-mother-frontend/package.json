@@ -4,17 +4,23 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.ts",
-    "dev": "vite",
+    "test": "node --import ./tests/register.mjs --test tests/*.test.mjs",
+    "dev": "node scripts/dev.ts",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "openapi2ts": "openapi2ts",
     "build-only": "vite build",
+    "build:preview": "node scripts/build-preview.ts",
     "type-check": "vue-tsc --build",
-    "lint": "run-s \"lint:*\"",
-    "lint:oxlint": "oxlint . --fix",
-    "lint:eslint": "eslint . --fix --cache",
-    "format": "prettier --write --experimental-cli src/"
+    "lint": "npm run lint:check",
+    "lint:oxlint": "oxlint src tests scripts vite*.ts eslint.config.ts openapi2ts.config.ts",
+    "lint:eslint": "eslint . --no-fix --no-cache",
+    "format": "prettier --write src/ tests/ scripts/",
+    "lint:check": "run-s lint:oxlint lint:eslint lint:architecture",
+    "lint:architecture": "node scripts/check-architecture.mjs",
+    "lint:fix": "oxlint src tests --fix && eslint src tests --fix",
+    "preview:gateway": "node scripts/preview-server.ts",
+    "check": "run-s type-check lint:check test build-only build:preview"
   },
   "dependencies": {
     "ant-design-vue": "^4.2.6",
@@ -23,14 +29,13 @@
     "highlight.js": "^11.11.1",
     "markdown-it": "^14.1.0",
     "pinia": "^4.0.3",
-    "tslib": "^2.8.1",
     "vue": "^3.5.42",
-    "vue-router": "^5.3.1"
+    "vue-router": "^5.3.1",
+    "@ant-design/icons-vue": "^7.0.1"
   },
   "devDependencies": {
     "@tsconfig/node24": "^24.0.5",
     "@types/node": "^24.13.4",
-    "@types/dompurify": "^3.2.0",
     "@types/markdown-it": "^14.1.2",
     "@umijs/openapi": "^1.14.1",
     "@vitejs/plugin-vue": "^6.0.8",

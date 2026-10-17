@@ -4,23 +4,32 @@
  * 登录 store 提供摘要的数据源，ProfileEditor 自己管理编辑草稿及保存状态，避免页面重复维护表单。
  * 编辑成功更新同一 store 后，传给 ProfileSummary 的 user 会随响应式数据同步变化。
  */
+import { useProfileEditorController } from '@/app/controllers.ts'
 import PageHeader from '@/components/PageHeader.vue'
 import { useLoginUserStore } from '@/stores/loginUserStore.ts'
-import ProfileEditor from './profile/components/ProfileEditor.vue'
-import ProfileSummary from './profile/components/ProfileSummary.vue'
+import { ProfileEditor } from '@/features/user-management/components'
+import { ProfileSummary } from '@/features/user-management/components'
 
 // 路由的登录守卫在进入本页前获取身份；这里读取共享资料用于展示。
 const loginUserStore = useLoginUserStore()
-</script><template>
+const editor = useProfileEditorController()
+</script>
+<template>
   <section class="profile-page">
-    <PageHeader eyebrow="PERSONAL SPACE" title="个人信息" description="管理你的平台资料，让 AI 更好地了解你的创作身份。">
-      <template #actions><span class="account-status"><i></i>账号正常</span></template>
+    <PageHeader
+      eyebrow="PERSONAL SPACE"
+      title="个人信息"
+      description="管理你的平台资料，让 AI 更好地了解你的创作身份。"
+    >
+      <template #actions
+        ><span class="account-status"><i></i>账号正常</span></template
+      >
     </PageHeader>
 
     <div class="profile-layout">
       <ProfileSummary :user="loginUserStore.loginUser" />
 
-      <ProfileEditor />
+      <ProfileEditor :controller="editor" />
     </div>
   </section>
 </template>
@@ -64,4 +73,5 @@ const loginUserStore = useLoginUserStore()
   .profile-layout {
     grid-template-columns: 1fr;
   }
-}</style>
+}
+</style>

@@ -22,7 +22,7 @@ export default defineConfigWithVueTs(
   },
 
   // 编译产物与覆盖率报告交给各自生成器维护，不参与手写源码规则检查。
-  globalIgnores(['**/dist/**', '**/dist-ssr/**', '**/coverage/**']),
+  globalIgnores(['**/dist/**', '**/dist-ssr/**', '**/coverage/**', 'src/api/**']),
 
   // Vue essential 规则先检查模板基本正确性，再叠加项目使用的 TypeScript 推荐规则。
   ...pluginVue.configs['flat/essential'],

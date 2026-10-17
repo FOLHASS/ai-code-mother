@@ -1,0 +1,33 @@
+# Configure TLS at the ingress or add your certificate/listen directives here.
+# Keep the backend private. Only the two explicit proxy paths below are public.
+server {
+    listen 80;
+    server_name app.example.com;
+    root /srv/ai-code-mother/dist;
+    index index.html;
+
+    location = /api/static { return 404; }
+    location ^~ /api/static/ { return 404; }
+    location /api/ {
+        proxy_pass http://backend:8123;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_read_timeout 120s;
+    }
+    location / { try_files $uri $uri/ /index.html; }
+}
+
+# Use a separate, credential-free site for generated content.
+server {
+    listen 80;
+    server_name preview.exampleusercontent.net;
+    location / {
+        proxy_pass http://127.0.0.1:5174;
+        proxy_set_header Host $host;
+        proxy_set_header Cookie "";
+        proxy_set_header Authorization "";
+        proxy_hide_header Set-Cookie;
+        proxy_read_timeout 30s;
+    }
+}

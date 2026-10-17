@@ -5,23 +5,33 @@
  * 左侧优先展示 introStatus；未传状态时，才根据 introPoints 渲染能力标签。
  * headingId 将介绍区与主标题关联，formLabel 为表单所在区域提供可访问名称。
  */
-import logoUrl from '@/assets/logo.png'
+import logoUrl from '@/assets/logo-display.png'
 
 // 内容由登录或注册页单向传入；本组件不修改 Props，也无需向外触发业务事件。
 defineProps<{
   // 介绍标题的 DOM 标识，需由调用方为当前页面提供。
+  /** 保存页面主标题对应的锚点 ID。 */
   headingId: string
+  /** 保存介绍区上方的短标签文案。 */
   introKicker: string
+  /** 保存介绍区标题。 */
   introTitle: string
+  /** 保存介绍区说明文案。 */
   introDescription: string
   // 可选的平台状态文案；与能力标签共用同一个展示位置。
+  /** 保存介绍区状态提示文案。 */
   introStatus?: string
   // 无状态文案时可展示的一组能力标签，数组元素同时用作渲染键。
+  /** 保存介绍区要点列表。 */
   introPoints?: string[]
+  /** 保存表单卡片上方的短标签文案。 */
   cardEyebrow: string
+  /** 保存表单卡片标题。 */
   cardTitle: string
+  /** 保存表单卡片说明文案。 */
   cardDescription: string
   // 右侧表单区域的无障碍名称，区别于可见的 cardTitle。
+  /** 保存表单区域的辅助说明文案。 */
   formLabel: string
 }>()
 </script>
@@ -86,7 +96,8 @@ defineProps<{
   position: absolute;
   inset: 0;
   opacity: 0.55;
-  background-image: linear-gradient(#dcecff 1px, transparent 1px),
+  background-image:
+    linear-gradient(#dcecff 1px, transparent 1px),
     linear-gradient(90deg, #dcecff 1px, transparent 1px);
   background-position: center;
   background-size: 44px 44px;
@@ -238,7 +249,10 @@ defineProps<{
   border: 1px solid #dbe5f0;
   border-radius: 8px;
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background-color 0.2s;
 }
 
 .auth-page-shell :deep(.field-input::placeholder) {
@@ -302,12 +316,15 @@ defineProps<{
   font: inherit;
   font-size: 15px;
   font-weight: 600;
-  background: #2679d9;
+  background: var(--color-brand);
   border: 0;
   border-radius: 8px;
   box-shadow: 0 10px 20px rgb(38 121 217 / 18%);
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  transition:
+    background-color 0.2s,
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .auth-page-shell :deep(.submit-button:hover:not(:disabled)) {
@@ -324,7 +341,7 @@ defineProps<{
 }
 
 .auth-page-shell :deep(.auth-footer a) {
-  color: #2679d9;
+  color: var(--color-brand);
   font-weight: 600;
   text-decoration: none;
 }

@@ -1,0 +1,8 @@
+{
+  "src/api/chatHistoryController.ts": "f6d991961a2c813636d5050befafe20df4e0cee39974a4075a0d9da95ccf0b48",
+  "src/api/staticResourceController.ts": "df22fd6cf91628a14f98e2a8a873b1e6237365925628fabf7a85fda371eb47ba",
+  "src/api/typings.d.ts": "277adc7427f4466da17118cc4d09208ec8ef4c25940519bbdb214635542236d4",
+  "src/api/appController.ts": "e464acc31107cfb5f5246ed418a543258d90b7f3656fbbbcc04c00ec7f4f58f8",
+  "src/api/index.ts": "ee184f5da901c026f519467db4b12f9a192947dea499d64de6061bacf656f509",
+  "src/api/userController.ts": "f5edd2731132346ac95145b0c627f3b2320b953ebdbe4d93ae2ec2e61d36175d"
+}

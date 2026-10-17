@@ -7,11 +7,12 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
+import { previewGatewayPlugin } from './scripts/previewPlugin.ts'
 
 // https://vite.dev/config/
 export default defineConfig({
-  // 两个插件分别提供 Vue 单文件组件编译能力与开发调试面板。
-  plugins: [vue(), vueDevTools()],
+  // 预览网关随 Vite 启停，IDE 直接运行 Vite 时也能展示生成的网站。
+  plugins: [vue(), vueDevTools(), previewGatewayPlugin()],
   resolve: {
     alias: {
       // 通过当前配置文件的 URL 计算绝对路径，避免依赖启动命令所在目录。
@@ -20,7 +21,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // 只在开发服务器生效：浏览器访问本站 /api，由代理转发到后端，预览 iframe 也可保持同源。
+      // 业务 API 代理保留后端 /api 前缀；生成网站通过独立预览网关加载。
       '/api': {
         // 不配置 rewrite，因此 /api 路径前缀会保留并匹配后端的 context-path。
         target: 'http://localhost:8123',

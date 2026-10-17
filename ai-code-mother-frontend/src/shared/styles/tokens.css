@@ -1,0 +1,21 @@
+:root {
+  color-scheme: light;
+  --color-surface: #fff;
+  --color-text-primary: #20364d;
+  --color-brand: #2679d9;
+  --color-border: #e4edf2;
+  --color-focus: #2679d9;
+}
+:where(button, a, input, textarea, select):focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}

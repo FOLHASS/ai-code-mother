@@ -17,7 +17,10 @@ export function getDownloadFileName(disposition: string | undefined, fallback: s
     }
   }
   // 兼容 Windows 与 Unix 路径分隔符，只取末段，并清除文件名中的不可见控制字符。
-  name = name.split(/[\\/]/).at(-1)?.replace(/[\x00-\x1f\x7f]/g, '') || fallback
+  name =
+    Array.from(name.split(/[\\/]/).at(-1) || '')
+      .filter((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) !== 127)
+      .join('') || fallback
   // 忽略后缀大小写，避免把已有的 .ZIP 再追加一次。
   return name.toLowerCase().endsWith('.zip') ? name : `${name}.zip`
 }

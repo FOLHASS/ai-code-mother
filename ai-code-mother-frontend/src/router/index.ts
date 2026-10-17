@@ -1,3 +1,4 @@
+import { createNavigationGuard } from '@/app/navigationGuard.ts'
 /**
  * 页面路由和访问前置检查。
  * 父路由负责选择布局，子路由负责具体页面；懒加载让页面模块在访问时才被请求。
@@ -32,7 +33,7 @@ const router = createRouter({
         {
           path: 'app/edit/:id',
           name: 'AppEditPage',
-          component: () => import('@/pages/AppEditPage.vue'),
+          component: () => import('@/pages/admin/AppEditPage.vue'),
           meta: { requiresAuth: true },
         },
         {
@@ -51,7 +52,7 @@ const router = createRouter({
         {
           path: 'admin/chatHistoryManage',
           name: 'AdminChatHistoryManagePage',
-          component: () => import('@/modules/ai-chat/views/ChatHistoryManagePage.vue'),
+          component: () => import('@/pages/admin/ChatHistoryManagePage.vue'),
           meta: { requiresAdmin: true },
         },
         {
@@ -86,27 +87,6 @@ const router = createRouter({
  * 在进入页面前等待登录态探测完成，避免刷新页面时把“尚未加载用户”误判为“无权限”。
  * 返回路由对象会重定向；返回 true 才允许继续原来的跳转。
  */
-router.beforeEach(async (to) => {
-  const loginUserStore = useLoginUserStore()
-  await loginUserStore.fetchLoginUser()
-
-  if (to.meta.requiresAuth && !loginUserStore.loginUser.id) {
-    // 记录带查询参数的目标地址，登录页可在成功后回到用户原本想访问的页面。
-    return {
-      name: 'loginPage',
-      query: { redirect: to.fullPath },
-    }
-  }
-
-  if (to.meta.requiresAdmin && loginUserStore.loginUser.userRole !== 'admin') {
-    // 管理员角色使用后端协议值 admin，拒绝后回首页并附带来源标识。
-    return {
-      path: '/',
-      query: { forbidden: 'admin' },
-    }
-  }
-
-  return true
-})
+router.beforeEach(createNavigationGuard(() => useLoginUserStore()))
 
 export default router

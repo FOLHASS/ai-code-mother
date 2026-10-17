@@ -12,10 +12,14 @@ import { getInitial } from '@/utils/app.ts'
 const props = withDefaults(
   defineProps<{
     // 头像图片地址；模板只以去空格后的非空判断决定是否使用图片。
+    /** 保存用户头像地址。 */
     avatar?: string
+    /** 保存显示名称。 */
     name?: string
     // 尺寸限定为组件已有的三档样式，分别适用于列表、常规展示和个人资料。
+    /** 设置头像的展示尺寸。 */
     size?: 'sm' | 'md' | 'lg'
+    /** 保存alt对应的数据。 */
     alt?: string
   }>(),
   {
@@ -48,7 +52,7 @@ const initial = computed(() => getInitial(displayName.value))
   flex: 0 0 auto;
   overflow: hidden;
   place-items: center;
-  color: #2679d9;
+  color: var(--color-brand);
   font-weight: 700;
   background: #e8f2ff;
   border-radius: 50%;
