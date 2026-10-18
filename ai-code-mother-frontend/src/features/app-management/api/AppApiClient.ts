@@ -42,12 +42,15 @@ export class AppApiClient {
       generated.adminListAppVoByPage(toWire<API.AppQueryRequest>(query), options),
       (page) => mapPage(page, mapApp),
     )
-  /** 更新相关状态或数据。 */
-  update = (body: AppUpdate) =>
-    adaptResponse(generated.updateApp(toWire<API.AppUpdateRequest>(body)), successful)
+  /** 更新应用名称，支持弹窗关闭时取消仍在等待的请求。 */
+  update = (body: AppUpdate, options?: RequestOptions) =>
+    adaptResponse(generated.updateApp(toWire<API.AppUpdateRequest>(body), options), successful)
   /** 更新管理端应用信息。 */
-  adminUpdate = (body: AppUpdate) =>
-    adaptResponse(generated.adminUpdateApp(toWire<API.AppAdminUpdateRequest>(body)), successful)
+  adminUpdate = (body: AppUpdate, options?: RequestOptions) =>
+    adaptResponse(
+      generated.adminUpdateApp(toWire<API.AppAdminUpdateRequest>(body), options),
+      successful,
+    )
   /** 删除相关状态或数据。 */
   delete = (body: { id: string }) =>
     adaptResponse(generated.deleteApp(toWire<API.DeleteRequest>(body)), successful)

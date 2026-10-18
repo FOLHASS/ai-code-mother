@@ -51,6 +51,14 @@ export class AdminAppManageController {
   private readonly showDetailsModalState = ref(false)
   /** 只读暴露详情弹窗的显示状态。 */
   readonly showDetailsModal = readonly(this.showDetailsModalState)
+  /** 保存当前编辑目标，独立于详情弹窗选择。 */
+  private readonly editingAppState = ref<AppSummary | null>(null)
+  /** 对外只读暴露当前编辑目标。 */
+  readonly editingApp = readonly(this.editingAppState)
+  /** 保存编辑弹窗显隐，避免编辑时离开当前分页。 */
+  private readonly showEditModalState = ref(false)
+  /** 对外只读暴露编辑弹窗显隐。 */
+  readonly showEditModal = readonly(this.showEditModalState)
   /** 保存聊天历史列表的检索表单数据。 */
   readonly searchForm = reactive<AppQuery>({
     appName: '',
@@ -186,9 +194,25 @@ export class AdminAppManageController {
     if (app.id) void this.router.push(`/app/${app.id}`)
   }
 
-  /** 打开应用编辑流程。 */
+  /** 关闭详情视图，并在当前列表上打开应用编辑弹窗。 */
   editApp = (app: AppSummary): void => {
-    if (app.id) void this.router.push(`/app/edit/${app.id}`)
+    if (this.disposed || !app.id || !this.isAdmin.value) return
+    this.showDetailsModalState.value = false
+    this.editingAppState.value = app
+    this.showEditModalState.value = true
+  }
+
+  /** 关闭时释放编辑目标，下一次打开重新读取详情。 */
+  setEditModalOpen = (open: boolean): void => {
+    this.showEditModalState.value = open
+    if (!open) this.editingAppState.value = null
+  }
+
+  /** 同步详情快照并按原有页码、筛选条件刷新管理列表。 */
+  handleAppSaved = (app: AppSummary): void => {
+    if (this.disposed) return
+    if (this.selectedAppState.value?.id === app.id) this.selectedAppState.value = app
+    void this.loadApps()
   }
 
   /** 删除指定应用并同步更新列表。 */
@@ -219,6 +243,7 @@ export class AdminAppManageController {
   dispose = (): void => {
     this.disposed = true
     this.requests.cancel()
+    this.setEditModalOpen(false)
   }
 
   /** 设置聊天记录详情弹窗的显示状态。 */

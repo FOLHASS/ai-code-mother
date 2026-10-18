@@ -5,7 +5,7 @@ import { AppEditModal } from '@/features/app-management/components'
 import { HomePromptHero } from '@/features/home/components'
 import { AppGallerySection } from '@/features/home/components'
 
-// 两套列表共享展示组件，各自保留当前页、总数、加载状态；编辑成功事件交回控制器同步名称。
+// 两套列表共享展示组件，各自保留分页和加载状态；编辑完成后同步应用信息并刷新列表。
 const { appsController, pageController, editController } = useHomeControllers()
 const {
   isLoggedIn,

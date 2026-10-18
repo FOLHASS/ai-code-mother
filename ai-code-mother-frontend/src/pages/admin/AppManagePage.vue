@@ -2,18 +2,17 @@
 import { FEATURED_PRIORITY } from '@/shared/domain/constants.ts'
 /**
  * 应用管理页面向管理员：多条件分页查询全部应用，查看详情、进入对话、编辑、精选及删除。
- * 当前页、筛选草稿和详情弹窗对象由页面持有；封面、页头、统计和详情 UI 复用公共组件。
+ * 列表控制器持有分页、筛选和弹窗目标；编辑保存后刷新当前列表，不离开管理页面。
  * 生成类型的选项与中文文案取自公共枚举配置，避免管理筛选与其他页面出现不同的取值表。
  */
-import { AppCover } from '@/features/app-management/components'
-import { AppDetailsModal } from '@/features/app-management/components'
+import { AppCover, AppDetailsModal, AppEditModal } from '@/features/app-management/components'
 import PageHeader from '@/components/PageHeader.vue'
 import PageStat from '@/components/PageStat.vue'
-import { useAdminAppManageController } from '@/app/controllers.ts'
+import { useAdminAppManageControllers } from '@/app/controllers.ts'
 import { formatDate } from '@/utils/app.ts'
 import { CODE_GEN_TYPE_OPTIONS, formatCodeGenType } from '@/utils/codeGenTypes.ts'
 
-const controller = useAdminAppManageController()
+const { controller, editController } = useAdminAppManageControllers()
 const {
   isLoading,
   currentPage,
@@ -22,6 +21,7 @@ const {
   apps,
   selectedApp,
   showDetailsModal,
+  showEditModal,
   setDetailsOpen,
   searchForm,
   isAdmin,
@@ -37,7 +37,7 @@ const {
 } = controller
 // 模板依次组合页头统计、筛选面板、表格与分页、应用详情弹窗。
 // 表格按加载/无数据/记录三种状态渲染；已精选项隐藏“精选”按钮，部署状态仅根据 deployKey 展示。
-// AppDetailsModal 使用 update:open 同步显隐，open-app/edit-app 与表格按钮共用导航函数。
+// 详情和表格共用编辑命令；编辑弹窗保存后保留当前筛选和页码。
 </script>
 
 <template>
@@ -208,6 +208,7 @@ const {
       @open-app="openApp"
       @edit-app="editApp"
     />
+    <AppEditModal :open="showEditModal" :controller="editController" />
   </section>
 </template>
 

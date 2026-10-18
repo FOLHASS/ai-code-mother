@@ -12,15 +12,17 @@ import {
 } from '@/features/user-management'
 import { HomeAppsController, HomePageController } from '@/features/home'
 import {
-  AppEditController,
   AppEditModalController,
   AdminAppManageController,
+  type AppEditModalProps,
+  type AppEditModalEvents,
 } from '@/features/app-management'
 import { ChatHistoryAdminController, ChatStreamApiClient } from '@/features/ai-chat'
 import { PreviewRepositoryService, VisualEditorController } from '@/features/preview-editor'
 import { AppChatSessionController } from '@/features/app-workbench'
 import { saveArchive } from '@/shared/ui/downloadArchive.ts'
 import { APP_BASE_URL } from '@/config/env.ts'
+import type { PageDependencies } from '@/shared/ports.ts'
 
 /** 组装登录页面控制器及其依赖。 */
 export const useLoginController = () =>
@@ -47,6 +49,26 @@ export const useGlobalHeaderController = (select: (key: string) => void) =>
 export const useProfileEditorController = () =>
   useController(new ProfileEditorController(usePageDependencies(), userApi))
 
+/** 组装共享编辑弹窗，在目标或登录用户变化时重新加载并在关闭时取消请求。 */
+function useAppEditModalController(
+  props: AppEditModalProps,
+  events: AppEditModalEvents,
+  page: PageDependencies,
+) {
+  const controller = useController(new AppEditModalController(props, events, page, appApi))
+  watch(
+    [
+      () => props.open,
+      () => props.app?.id,
+      () => page.session.loginUser.id,
+      () => page.session.loginUser.userRole,
+    ],
+    () => void controller.load(),
+    { immediate: true, flush: 'sync' },
+  )
+  return controller
+}
+
 /** 组装首页控制器及其依赖。 */
 export function useHomeControllers() {
   const page = usePageDependencies()
@@ -61,15 +83,11 @@ export function useHomeControllers() {
       return pageController.editingApp.value
     },
   }
-  const editController = useController(
-    new AppEditModalController(
-      modalProps,
-      { updateOpen: pageController.setEditModalOpen, saved: appsController.handleAppSaved },
-      page,
-      appApi,
-    ),
+  const editController = useAppEditModalController(
+    modalProps,
+    { updateOpen: pageController.setEditModalOpen, saved: appsController.handleAppSaved },
+    page,
   )
-  watch([() => modalProps.open, () => modalProps.app], editController.reset, { immediate: true })
   return { appsController, pageController, editController }
 }
 /** 组装用户列表控制器及其依赖。 */
@@ -89,24 +107,27 @@ export function useUserMutationsController(list: UserListController) {
     ),
   )
 }
-/** 组装管理端应用控制器及其依赖。 */
-export const useAdminAppManageController = () =>
-  useController(new AdminAppManageController(usePageDependencies(), appApi))
+/** 组装管理列表与编辑弹窗，保存后刷新当前页。 */
+export function useAdminAppManageControllers() {
+  const page = usePageDependencies()
+  const controller = useController(new AdminAppManageController(page, appApi))
+  const editController = useAppEditModalController(
+    {
+      get open() {
+        return controller.showEditModal.value
+      },
+      get app() {
+        return controller.editingApp.value
+      },
+    },
+    { updateOpen: controller.setEditModalOpen, saved: controller.handleAppSaved },
+    page,
+  )
+  return { controller, editController }
+}
 /** 组装聊天历史管理控制器及其依赖。 */
 export const useChatHistoryAdminController = () =>
   useController(new ChatHistoryAdminController(usePageDependencies(), chatHistoryApi))
-/** 组装应用编辑控制器及其依赖。 */
-export function useAppEditController() {
-  const route = useRoute()
-  const controller = useController(new AppEditController(route, usePageDependencies(), appApi))
-  watch(
-    () => route.params.id,
-    () => {
-      void controller.load()
-    },
-  )
-  return controller
-}
 /** 组装应用聊天会话控制器及其依赖。 */
 export function useAppChatSession() {
   const route = useRoute()

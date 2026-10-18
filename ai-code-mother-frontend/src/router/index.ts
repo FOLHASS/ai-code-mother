@@ -31,12 +31,6 @@ const router = createRouter({
           meta: { requiresAuth: true },
         },
         {
-          path: 'app/edit/:id',
-          name: 'AppEditPage',
-          component: () => import('@/pages/admin/AppEditPage.vue'),
-          meta: { requiresAuth: true },
-        },
-        {
           path: 'admin/appManage',
           // 三个管理页面都声明 requiresAdmin，统一交给下面的全局守卫检查。
           name: 'AdminAppManagePage',

@@ -130,6 +130,7 @@ export class HomePageController {
   /** 设置应用编辑弹窗的显示状态。 */
   setEditModalOpen = (open: boolean): void => {
     this.showEditModalState.value = open
+    if (!open) this.editingAppState.value = null
   }
 
   /** 取消未完成任务并释放控制器持有的资源。 */

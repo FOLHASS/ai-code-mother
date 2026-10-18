@@ -141,11 +141,12 @@ export class HomeAppsController {
 
   /** 处理应用保存完成后的列表刷新。 */
   handleAppSaved = (updatedApp: AppSummary): void => {
-    const updateName = (app: AppSummary) =>
-      app.id === updatedApp.id ? { ...app, appName: updatedApp.appName } : app
-    this.myAppsState.value = this.myAppsState.value.map(updateName)
-    this.goodAppsState.value = this.goodAppsState.value.map(updateName)
-    if (this.goodSearch.value.trim()) void this.loadGoodApps()
+    const updateApp = (app: AppSummary) =>
+      app.id === updatedApp.id ? { ...app, ...updatedApp } : app
+    this.myAppsState.value = this.myAppsState.value.map(updateApp)
+    this.goodAppsState.value = this.goodAppsState.value.map(updateApp)
+    void this.loadMyApps()
+    void this.loadGoodApps()
   }
 
   /** 按关键词筛选精选应用。 */
