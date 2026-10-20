@@ -1,7 +1,7 @@
 import { errorMessage } from '@/shared/api/errors.ts'
 import { USER_ROLE } from '@/shared/domain/constants.ts'
 import { LatestRequest } from '@/shared/async/LatestRequest.ts'
-import type { PageDependencies } from '@/shared/ports.ts'
+import type { ControllerCommonContext } from '@/shared/ports.ts'
 import type { ChatHistoryRepository } from '../api/ChatHistoryApiClient.ts'
 import type { ChatHistoryRecord } from '@/shared/domain/models.ts'
 import { readonly, computed, reactive, ref } from 'vue'
@@ -73,7 +73,7 @@ export class ChatHistoryAdminController {
   /** 接收管理端聊天历史控制器运行所需的依赖并初始化状态。 */
   constructor(
     /** 提供页面级会话、路由和通知依赖。 */
-    private readonly dependencies: PageDependencies,
+    private readonly dependencies: ControllerCommonContext,
     /** 提供控制器所需的后端接口操作。 */
     private readonly api: Pick<ChatHistoryRepository, 'listAdmin'>,
   ) {}

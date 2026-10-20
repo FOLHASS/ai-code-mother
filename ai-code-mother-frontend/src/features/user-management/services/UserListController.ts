@@ -1,9 +1,9 @@
 import { errorMessage } from '@/shared/api/errors.ts'
 import { USER_ROLE } from '@/shared/domain/constants.ts'
 import { LatestRequest } from '@/shared/async/LatestRequest.ts'
-import type { PageDependencies } from '@/shared/ports.ts'
-import type { UserRepository } from '../api/UserApiClient.ts'
-import type { UserQuery, UserSummary } from '@/shared/domain/models.ts'
+import type { ControllerCommonContext } from '@/shared/ports.ts'
+import type { UserApi } from '../api/UserApiClient.ts'
+import type { UserQuery, UserInfo } from '@/shared/domain/models.ts'
 import { readonly, computed, reactive, ref } from 'vue'
 
 /** 管理用户列表查询、分页和变更后的刷新。 */
@@ -42,7 +42,7 @@ export class UserListController {
   /** 只读暴露当前用户列表的总记录数。 */
   readonly totalUsers = readonly(this.totalUsersState)
   /** 保存用户的内部响应状态。 */
-  private readonly usersState = ref<UserSummary[]>([])
+  private readonly usersState = ref<UserInfo[]>([])
   /** 只读暴露当前用户列表。 */
   readonly users = readonly(this.usersState)
   /** 保存最近一次成功应用的用户检索条件。 */
@@ -57,9 +57,9 @@ export class UserListController {
   /** 接收用户列表控制器运行所需的依赖并初始化状态。 */
   constructor(
     /** 提供页面级会话、路由和通知依赖。 */
-    private readonly dependencies: PageDependencies,
+    private readonly dependencies: ControllerCommonContext,
     /** 提供控制器所需的后端接口操作。 */
-    private readonly api: Pick<UserRepository, 'listVo'>,
+    private readonly api: Pick<UserApi, 'listVo'>,
   ) {}
 
   /** 按当前筛选和分页条件加载用户列表。 */

@@ -1,4 +1,6 @@
-/** 携带接口错误码和 HTTP 状态的标准化异常。 */
+/**
+ * 封装自己的请求报错类型，
+ */
 export class ApiError extends Error {
   /** 接收接口错误对象运行所需的依赖并初始化状态。 */
   constructor(

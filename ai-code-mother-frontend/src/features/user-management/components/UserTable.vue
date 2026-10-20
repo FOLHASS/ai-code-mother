@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { UserSummary } from '@/shared/domain/models.ts'
+import type { UserInfo } from '@/shared/domain/models.ts'
 /**
  * 只读用户表格与分页区域：所有数据、页码和加载态都由父级提供。
  * 编辑、删除和翻页均通过 Emits 发出，不在表格中请求接口或直接改动列表。
@@ -27,7 +27,7 @@ type UserTableColumn = {
 
 // 列表和分页为单向数据流；isDeleting 控制所有删除按钮，避免同一删除流程中重复操作。
 defineProps<{
-  users: readonly UserSummary[]
+  users: readonly UserInfo[]
   // 后端返回的总记录数，用于统计、分页显示和下一页是否可用的判断。
   totalUsers: number
   isLoading: boolean
@@ -38,8 +38,8 @@ defineProps<{
 }>()
 // 操作事件携带完整用户对象以便回填或确认；分页事件仅携带目标页码。
 const emit = defineEmits<{
-  edit: [user: UserSummary]
-  delete: [user: UserSummary]
+  edit: [user: UserInfo]
+  delete: [user: UserInfo]
   'page-change': [page: number]
 }>()
 

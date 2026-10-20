@@ -1,5 +1,5 @@
 import { readonly, ref, type Ref } from 'vue'
-import type { AppSummary } from '@/shared/domain/models.ts'
+import type { AppInfo } from '@/shared/domain/models.ts'
 import type { ChatStreamMessage } from '../types/chatEvent.ts'
 import type { ChatMessage } from '../types/chatMessage.ts'
 import type { ChatTimelinePort } from './ChatTimeline.ts'
@@ -7,7 +7,7 @@ import type { ChatStreamPort } from '../api/ChatStreamApiClient.ts'
 import { errorMessage } from '@/shared/api/errors.ts'
 
 export type ChatGenerationContext = {
-  app: Readonly<Ref<AppSummary | null>>
+  app: Readonly<Ref<AppInfo | null>>
   canInteract: Readonly<Ref<boolean>>
   historyLoaded: Readonly<Ref<boolean>>
   getVersion: () => number
@@ -33,7 +33,7 @@ export class ChatGenerationService {
   /** 接收聊天生成服务运行所需的依赖并初始化状态。 */
   constructor(
     /** 提供当前业务流程使用的共享状态和回调。 */
-    private readonly context: ChatGenerationContext,
+    private readonly generationContext: ChatGenerationContext,
     /** 提供聊天流请求能力。 */
     private readonly streamApi: ChatStreamPort,
     /** 管理聊天消息时间线及消息合并。 */
@@ -91,7 +91,7 @@ export class ChatGenerationService {
 
   /** 发送用户消息并消费服务端的流式生成事件。 */
   send = async (value = this.input.value, isInitial = false): Promise<void> => {
-    const { app, canInteract, historyLoaded, getVersion } = this.context
+    const { app, canInteract, historyLoaded, getVersion } = this.generationContext
     const content = value.trim()
     if (
       !content ||
@@ -106,8 +106,10 @@ export class ChatGenerationService {
     this.controller = controller
     const current = () =>
       version === getVersion() && this.controller === controller && !controller.signal.aborted
+
+    // 如果不是第一次发送提示词，需要考虑是否采用了编辑元素 需要添加提示词
     const prompt =
-      !isInitial && this.context.prepareMessage ? this.context.prepareMessage(content) : content
+      !isInitial && this.generationContext.prepareMessage ? this.generationContext.prepareMessage(content) : content
     if (!isInitial) this.input.value = ''
     const assistant: ChatMessage = {
       id: `live-${++this.messageId}`,
@@ -125,14 +127,14 @@ export class ChatGenerationService {
       assistant,
     )
     this.streaming.value = true
-    this.context.onMessageSent?.()
-    this.context.onUpdated?.()
+    this.generationContext.onMessageSent?.()
+    this.generationContext.onUpdated?.()
     let timer: ReturnType<typeof setTimeout> | undefined
     const flush = () => {
       timer = undefined
       if (current()) {
         this.timeline.update(assistant)
-        this.context.onUpdated?.()
+        this.generationContext.onUpdated?.()
       }
     }
     let completed = false
@@ -155,7 +157,7 @@ export class ChatGenerationService {
         if (tool.status === 'running') tool.status = 'failed'
       })
       assistant.content += `${assistant.content ? '\n\n' : ''}[生成失败] ${errorMessage(error, '生成失败，请稍后重试')}`
-      this.context.onError?.(error)
+      this.generationContext.onError?.(error)
     } finally {
       if (timer) clearTimeout(timer)
       if (current()) {
@@ -163,7 +165,7 @@ export class ChatGenerationService {
         flush()
         this.streaming.value = false
         this.controller = null
-        if (completed) this.context.onCompleted?.()
+        if (completed) this.generationContext.onCompleted?.()
       }
     }
   }

@@ -40,4 +40,7 @@ export class UserApiClient {
     )
 }
 
-export type UserRepository = Pick<UserApiClient, keyof UserApiClient>
+/**
+ * 供业务使用的数据接口
+ */
+export type UserApi = Pick<UserApiClient, keyof UserApiClient>

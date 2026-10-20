@@ -2,18 +2,18 @@ import { computed, reactive, readonly, ref } from 'vue'
 import { appPermissionPolicy } from './AppPermissionPolicyService.ts'
 import { LatestRequest } from '@/shared/async/LatestRequest.ts'
 import { errorMessage } from '@/shared/api/errors.ts'
-import type { PageDependencies } from '@/shared/ports.ts'
-import type { AppRepository } from '../api/AppApiClient.ts'
-import type { AppSummary, AppUpdate } from '@/shared/domain/models.ts'
+import type { ControllerCommonContext } from '@/shared/ports.ts'
+import type { AppApi } from '../api/AppApiClient.ts'
+import type { AppInfo, AppUpdate } from '@/shared/domain/models.ts'
 
 export type AppEditModalProps = {
   open: boolean
-  app: AppSummary | null
+  app: AppInfo | null
 }
 
 export type AppEditModalEvents = {
   updateOpen: (open: boolean) => void
-  saved: (app: AppSummary) => void
+  saved: (app: AppInfo) => void
 }
 
 /** 统一管理应用编辑弹窗的数据加载、权限检查和保存流程。 */
@@ -23,7 +23,7 @@ export class AppEditModalController {
   /** 标记控制器是否已随页面销毁。 */
   private disposed = false
   /** 保存本次打开时读取到的应用信息，避免直接修改列表数据。 */
-  private readonly appState = ref<AppSummary | null>(null)
+  private readonly appState = ref<AppInfo | null>(null)
   /** 保存弹窗详情加载状态。 */
   private readonly loading = ref(false)
   /** 保存详情加载错误，供弹窗展示和重试。 */
@@ -52,10 +52,10 @@ export class AppEditModalController {
     /** 将关闭和保存结果交回所属页面。 */
     private readonly events: AppEditModalEvents,
     /** 提供会话初始化和界面通知能力。 */
-    private readonly dependencies: Pick<PageDependencies, 'session' | 'notify'>,
+    private readonly dependencies: Pick<ControllerCommonContext, 'session' | 'notify'>,
     /** 读取最新应用详情并根据角色选择更新接口。 */
     private readonly api: Pick<
-      AppRepository,
+      AppApi,
       'getVoById' | 'adminGetVoById' | 'update' | 'adminUpdate'
     >,
   ) {}

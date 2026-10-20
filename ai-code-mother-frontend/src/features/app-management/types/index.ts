@@ -1,1 +1,1 @@
-export type { AppId, AppSummary, AppPermissions } from './app.ts'
+export type { AppId, AppInfo, AppPermissions } from './app.ts'

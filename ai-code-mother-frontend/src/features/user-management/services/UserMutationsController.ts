@@ -1,7 +1,7 @@
 import { errorMessage } from '@/shared/api/errors.ts'
-import type { PageDependencies } from '@/shared/ports.ts'
-import type { UserRepository } from '../api/UserApiClient.ts'
-import type { UserCreate, UserSummary, UserUpdate } from '@/shared/domain/models.ts'
+import type { ControllerCommonContext } from '@/shared/ports.ts'
+import type { UserApi } from '../api/UserApiClient.ts'
+import type { UserCreate, UserInfo, UserUpdate } from '@/shared/domain/models.ts'
 import { readonly, ref } from 'vue'
 
 type UserMutationContext = {
@@ -44,7 +44,7 @@ export class UserMutationsController {
   /** 只读暴露编辑弹窗的显示状态。 */
   readonly showEditModal = readonly(this.showEditModalState)
   /** 保存选中用户的内部响应状态。 */
-  private readonly selectedUserState = ref<UserSummary | null>(null)
+  private readonly selectedUserState = ref<UserInfo | null>(null)
   /** 只读暴露当前选中的用户。 */
   readonly selectedUser = readonly(this.selectedUserState)
 
@@ -53,13 +53,13 @@ export class UserMutationsController {
     /** 提供当前业务流程使用的共享状态和回调。 */
     private readonly context: UserMutationContext,
     /** 提供页面级会话、路由和通知依赖。 */
-    private readonly dependencies: PageDependencies,
+    private readonly dependencies: ControllerCommonContext,
     /** 提供控制器所需的后端接口操作。 */
-    private readonly api: Pick<UserRepository, 'add' | 'update' | 'delete'>,
+    private readonly api: Pick<UserApi, 'add' | 'update' | 'delete'>,
   ) {}
 
   /** 打开编辑弹窗并填入所选用户信息。 */
-  openEditModal = (user: UserSummary): void => {
+  openEditModal = (user: UserInfo): void => {
     this.selectedUserState.value = user
     this.showEditModalState.value = true
   }
@@ -138,7 +138,7 @@ export class UserMutationsController {
   }
 
   /** 请求删除所选用户并更新列表。 */
-  handleDeleteUser = (user: UserSummary): void => {
+  handleDeleteUser = (user: UserInfo): void => {
     if (!user.id) return
     this.dependencies.confirm({
       title: '确认删除用户？',
@@ -151,7 +151,7 @@ export class UserMutationsController {
   }
 
   /** 删除指定用户并处理操作结果。 */
-  private deleteUser = async (user: UserSummary): Promise<void> => {
+  private deleteUser = async (user: UserInfo): Promise<void> => {
     if (this.disposed) return
     if (this.isDeletingState.value || !user.id) return
     this.isDeletingState.value = true

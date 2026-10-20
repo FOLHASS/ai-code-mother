@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AppSummary } from '@/shared/domain/models.ts'
+import type { AppInfo } from '@/shared/domain/models.ts'
 /**
  * 应用详情展示弹窗：直接消费父级传入的 VO，展示概览、元数据、初始需求及三个底部操作。
  * 不在弹窗内部加载数据或判断权限；父级管理详情来源以及查看、编辑的实际处理方式。
@@ -13,14 +13,14 @@ import { formatCodeGenType } from '@/utils/codeGenTypes.ts'
 // open 配合父级 v-model 管理显隐；没有 app 时不渲染详情主体，避免读取空对象字段。
 defineProps<{
   open: boolean
-  app: AppSummary | null
+  app: AppInfo | null
 }>()
 
 // 关闭只更新 open；查看与编辑携带当前 app，由父级决定路由或弹窗，不复制导航逻辑。
 const emit = defineEmits<{
   'update:open': [open: boolean]
-  openApp: [app: AppSummary]
-  editApp: [app: AppSummary]
+  openApp: [app: AppInfo]
+  editApp: [app: AppInfo]
 }>()
 // 模板按封面/作者概览 → 双列元数据 → 保留换行的初始需求 → 操作区排列。
 // priority === 99 同时控制精选封面配色与徽标；deployKey 的存在仅用于展示部署状态。

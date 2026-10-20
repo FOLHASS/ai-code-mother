@@ -1,4 +1,6 @@
-/** 在历史记录和实时 SSE 更新之间共用的聊天消息视图模型。 */
+/**
+ * 在历史记录和实时 SSE 更新之间共用的聊天消息视图模型。
+ */
 export type ChatMessage = {
   id: string
   historyId?: string

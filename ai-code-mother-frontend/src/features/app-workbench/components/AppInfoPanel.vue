@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AppSummary } from '@/shared/domain/models.ts'
+import type { AppInfo } from '@/shared/domain/models.ts'
 /**
  * 应用标题浮层中的详情展示：复用详情接口 AppVO 及其关联 user 信息，避免再次请求。
  * 创建者、生成类型、部署状态等字段采用共享格式化函数；删除仅作为有权限时的事件出口。
@@ -13,7 +13,7 @@ import { formatCodeGenType } from '@/utils/codeGenTypes.ts'
 
 /** app 为当前应用详情；deployedUrl 优先采用本次部署返回值；canDelete 由父层结合权限和生成状态计算。 */
 const props = defineProps<{
-  app: AppSummary
+  app: AppInfo
   deployedUrl: string
   canDelete: boolean
 }>()

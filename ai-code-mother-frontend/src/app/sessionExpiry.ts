@@ -1,9 +1,9 @@
 import type { Router } from 'vue-router'
-import type { SessionPort } from '@/shared/ports.ts'
+import type { UserSession } from '@/shared/ports.ts'
 import { authEvents } from '@/shared/api/authEvents.ts'
 
 /** 注册会话过期处理逻辑。 */
-export function installSessionExpiry(router: Router, session: SessionPort): () => void {
+export function installSessionExpiry(router: Router, session: UserSession): () => void {
   let redirecting = false
   return authEvents.subscribe(() => {
     session.clearSession()

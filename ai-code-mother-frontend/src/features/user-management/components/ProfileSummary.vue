@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SessionUser } from '@/shared/domain/models.ts'
+import type { SessionUserInfo } from '@/shared/domain/models.ts'
 /**
  * 只读用户摘要：接收登录用户资料，展示头像、名称、账号、角色以及时间字段。
  * 父页面负责提供 user，编辑表单保存后通过同一 store 驱动这里更新；本组件没有保存或请求行为。
@@ -13,7 +13,7 @@ import { formatDateTime } from '@/utils/app.ts'
 // 本地类型对应已支持的角色文案键；未知或缺少角色在摘要中回退为普通用户。
 type UserRole = 'user' | 'admin' | 'ban'
 // 用户资料由父页面传入，组件不修改 Props。
-const props = defineProps<{ user: SessionUser }>()
+const props = defineProps<{ user: SessionUserInfo }>()
 const roleLabels: Record<UserRole, string> = {
   user: '普通用户',
   admin: '管理员',

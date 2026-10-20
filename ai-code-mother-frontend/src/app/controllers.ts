@@ -1,6 +1,6 @@
 import { watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { usePageDependencies, useController } from './useController.ts'
+import { useControllerContext, useController } from './useController.ts'
 import { appApi, userApi, chatHistoryApi, notifier } from './services.ts'
 import {
   LoginController,
@@ -22,13 +22,13 @@ import { PreviewRepositoryService, VisualEditorController } from '@/features/pre
 import { AppChatSessionController } from '@/features/app-workbench'
 import { saveArchive } from '@/shared/ui/downloadArchive.ts'
 import { APP_BASE_URL } from '@/config/env.ts'
-import type { PageDependencies } from '@/shared/ports.ts'
+import type { ControllerCommonContext } from '@/shared/ports.ts'
 
 /** 组装登录页面控制器及其依赖。 */
 export const useLoginController = () =>
   new LoginController(
     useRoute(),
-    usePageDependencies(),
+    useControllerContext(),
     userApi,
     window.location.origin,
     APP_BASE_URL,
@@ -37,23 +37,23 @@ export const useLoginController = () =>
 export const useRegisterController = () =>
   new RegisterController(
     useRoute(),
-    usePageDependencies(),
+    useControllerContext(),
     userApi,
     window.location.origin,
     APP_BASE_URL,
   )
 /** 组装全局导航控制器及其依赖。 */
 export const useGlobalHeaderController = (select: (key: string) => void) =>
-  new GlobalHeaderController(usePageDependencies(), userApi, useRoute(), select)
+  new GlobalHeaderController(useControllerContext(), userApi, useRoute(), select)
 /** 组装个人资料编辑控制器及其依赖。 */
 export const useProfileEditorController = () =>
-  useController(new ProfileEditorController(usePageDependencies(), userApi))
+  useController(new ProfileEditorController(useControllerContext(), userApi))
 
 /** 组装共享编辑弹窗，在目标或登录用户变化时重新加载并在关闭时取消请求。 */
 function useAppEditModalController(
   props: AppEditModalProps,
   events: AppEditModalEvents,
-  page: PageDependencies,
+  page: ControllerCommonContext,
 ) {
   const controller = useController(new AppEditModalController(props, events, page, appApi))
   watch(
@@ -71,7 +71,7 @@ function useAppEditModalController(
 
 /** 组装首页控制器及其依赖。 */
 export function useHomeControllers() {
-  const page = usePageDependencies()
+  const page = useControllerContext()
   const appsController = useController(new HomeAppsController(page, appApi))
   watch(() => page.session.loginUser.id, appsController.sessionChanged, { flush: 'sync' })
   const pageController = useController(new HomePageController(appsController, page, appApi))
@@ -92,7 +92,7 @@ export function useHomeControllers() {
 }
 /** 组装用户列表控制器及其依赖。 */
 export const useUserListController = () =>
-  useController(new UserListController(usePageDependencies(), userApi))
+  useController(new UserListController(useControllerContext(), userApi))
 /** 组装用户变更控制器及其依赖。 */
 export function useUserMutationsController(list: UserListController) {
   return useController(
@@ -102,14 +102,14 @@ export function useUserMutationsController(list: UserListController) {
         refreshAfterCreation: list.refreshAfterCreation,
         refreshAfterRemoval: list.refreshAfterRemoval,
       },
-      usePageDependencies(),
+      useControllerContext(),
       userApi,
     ),
   )
 }
 /** 组装管理列表与编辑弹窗，保存后刷新当前页。 */
 export function useAdminAppManageControllers() {
-  const page = usePageDependencies()
+  const page = useControllerContext()
   const controller = useController(new AdminAppManageController(page, appApi))
   const editController = useAppEditModalController(
     {
@@ -125,20 +125,27 @@ export function useAdminAppManageControllers() {
   )
   return { controller, editController }
 }
-/** 组装聊天历史管理控制器及其依赖。 */
+
+/**
+ * 组装聊天历史管理控制器及其依赖
+ */
 export const useChatHistoryAdminController = () =>
-  useController(new ChatHistoryAdminController(usePageDependencies(), chatHistoryApi))
-/** 组装应用聊天会话控制器及其依赖。 */
+  useController(new ChatHistoryAdminController(useControllerContext(), chatHistoryApi))
+
+/**
+ * 组装应用聊天会话控制器及其依赖
+ * 1/
+ */
 export function useAppChatSession() {
   const route = useRoute()
   const session = useController(
     new AppChatSessionController({
       route,
-      page: usePageDependencies(),
-      apps: appApi,
-      history: chatHistoryApi,
-      stream: new ChatStreamApiClient(),
-      preview: new PreviewRepositoryService(),
+      controllerCommonContext: useControllerContext(),
+      appApi: appApi,
+      historyApi: chatHistoryApi,
+      streamApi: new ChatStreamApiClient(),
+      previewApi: new PreviewRepositoryService(),
       editor: new VisualEditorController(notifier),
       saveArchive,
       openUrl: (url) => {

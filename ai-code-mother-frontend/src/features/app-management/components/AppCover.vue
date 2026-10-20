@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AppSummary } from '@/shared/domain/models.ts'
+import type { AppInfo } from '@/shared/domain/models.ts'
 /**
  * 多处复用的应用封面展示：卡片、详情摘要、管理表格和弹窗共享图片裁切及默认占位。
  * 只依赖应用名称和封面字段，不绑定任何页面状态，也不请求接口或修改传入数据。
@@ -14,7 +14,7 @@ type AppCoverSize = 'card' | 'summary' | 'table' | 'modal'
 // 使用 Pick 限制依赖字段，调用者无需提供完整 AppVO；空应用也能正常显示占位图。
 const props = withDefaults(
   defineProps<{
-    app?: Pick<AppSummary, 'appName' | 'cover'> | null
+    app?: Pick<AppInfo, 'appName' | 'cover'> | null
     size?: AppCoverSize
     // 精选状态只切换无封面时的占位配色，已有图片仍按原图展示。
     featured?: boolean

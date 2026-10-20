@@ -11,7 +11,7 @@ import { AppChatHeader } from '@/features/app-workbench/components'
 import { AppPreviewPanel } from '@/features/app-workbench/components'
 
 // 从同一个会话实例取得响应式状态；模板自动解包 ref，所有区域共享一致的应用与生成状态。
-const session = useAppChatSession()
+const appChatSession = useAppChatSession()
 const {
   router,
   app,
@@ -48,8 +48,8 @@ const {
   handleDeploy,
   handleDownload,
   openDeployUrl,
-} = session
-const removeApp = session.removeApp
+} = appChatSession
+const removeApp = appChatSession.removeApp
 </script>
 
 <template>

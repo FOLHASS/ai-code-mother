@@ -13,54 +13,106 @@ import type { AppCreate, AppQuery, AppUpdate } from '@/shared/domain/models.ts'
 
 /** 集中封装应用创建、查询、更新、部署和下载接口。 */
 export class AppApiClient {
-  /** 创建应用或用户并返回接口结果。 */
+  /**
+   * 创建应用或用户并返回接口结果
+   * @param body
+   */
   add = (body: AppCreate) => adaptResponse(generated.addApp(body), entityId)
-  /** 读取vo by id相关状态或数据。 */
+
+  /**
+   * 读取vo by id相关状态或数据
+   * @param params
+   * @param options
+   */
   getVoById = (params: { id: string }, options?: RequestOptions) =>
     adaptResponse(generated.getAppVoById(toWire<API.getAppVOByIdParams>(params), options), mapApp)
-  /** 按 ID 查询管理端应用详情。 */
+
+  /**
+   * 按 ID 查询管理端应用详情。
+   * @param params
+   * @param options
+   */
   adminGetVoById = (params: { id: string }, options?: RequestOptions) =>
     adaptResponse(
       generated.adminGetAppVoById(toWire<API.adminGetAppVOByIdParams>(params), options),
       mapApp,
     )
-  /** 分页查询当前用户的应用列表。 */
+
+  /**
+   * 分页查询当前用户的应用列表。
+   * @param query
+   * @param options
+   */
   listMyVoByPage = (query: AppQuery, options?: RequestOptions) =>
     adaptResponse(
       generated.listMyAppVoByPage(toWire<API.AppQueryRequest>(query), options),
       (page) => mapPage(page, mapApp),
     )
-  /** 分页查询首页精选应用列表。 */
+
+  /**
+   * 分页查询首页精选应用列表
+   * @param query
+   * @param options
+   */
   listGoodVoByPage = (query: AppQuery, options?: RequestOptions) =>
     adaptResponse(
       generated.listGoodAppVoByPage(toWire<API.AppQueryRequest>(query), options),
       (page) => mapPage(page, mapApp),
     )
-  /** 分页查询管理端应用列表。 */
+
+  /**
+   * 分页查询管理端应用列表。
+   * @param query
+   * @param options
+   */
   adminListVoByPage = (query: AppQuery, options?: RequestOptions) =>
     adaptResponse(
       generated.adminListAppVoByPage(toWire<API.AppQueryRequest>(query), options),
       (page) => mapPage(page, mapApp),
     )
-  /** 更新应用名称，支持弹窗关闭时取消仍在等待的请求。 */
+
+  /**
+   * 更新应用名称，支持弹窗关闭时取消仍在等待的请求。
+   * @param body
+   * @param options
+   */
   update = (body: AppUpdate, options?: RequestOptions) =>
     adaptResponse(generated.updateApp(toWire<API.AppUpdateRequest>(body), options), successful)
-  /** 更新管理端应用信息。 */
+
+  /**
+   * 更新管理端应用信息。
+   * @param body
+   * @param options
+   */
   adminUpdate = (body: AppUpdate, options?: RequestOptions) =>
     adaptResponse(
       generated.adminUpdateApp(toWire<API.AppAdminUpdateRequest>(body), options),
       successful,
     )
-  /** 删除相关状态或数据。 */
+
+  /**
+   * 删除相关状态或数据。
+   * @param body
+   */
   delete = (body: { id: string }) =>
     adaptResponse(generated.deleteApp(toWire<API.DeleteRequest>(body)), successful)
-  /** 删除管理端应用。 */
+  /**
+   * 删除管理端应用。
+   * @param body
+   */
   adminDelete = (body: { id: string }) =>
     adaptResponse(generated.adminDeleteApp(toWire<API.DeleteRequest>(body)), successful)
-  /** 部署当前应用代码并保存部署结果。 */
+  /**
+   * 部署当前应用代码并保存部署结果。
+   * @param params
+   */
   deploy = (params: { appId: string }) =>
     adaptResponse(generated.deploy(toWire<API.deployParams>(params)), (url) => url)
-  /** 下载应用源代码归档。 */
+  /**
+   * 下载应用源代码归档。
+   * @param params
+   * @param options
+   */
   downloadCode = async (params: { appId: string }, options?: RequestOptions) => {
     const response = await generated.downloadAppCode(toWire<API.downloadAppCodeParams>(params), {
       ...options,
@@ -78,4 +130,8 @@ export class AppApiClient {
   }
 }
 
-export type AppRepository = Pick<AppApiClient, keyof AppApiClient>
+/**
+ * 对与AppApiClient提供了一层封装层
+ * 真实对业务场景直接依赖这层封装层
+ */
+export type AppApi = Pick<AppApiClient, keyof AppApiClient>

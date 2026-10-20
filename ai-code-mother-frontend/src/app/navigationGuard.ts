@@ -1,11 +1,11 @@
 import type { RouteLocationRaw } from 'vue-router'
-import type { SessionPort } from '@/shared/ports.ts'
+import type { UserSession } from '@/shared/ports.ts'
 import type { SessionStatus } from '@/shared/auth/SessionState.ts'
 import { USER_ROLE } from '@/shared/domain/constants.ts'
 
 /** 创建并配置应用路由导航守卫。 */
 export function createNavigationGuard(
-  getSession: () => Pick<SessionPort, 'loginUser' | 'fetchLoginUser'> & {
+  getSession: () => Pick<UserSession, 'loginUser' | 'fetchLoginUser'> & {
     /** 保存当前业务状态。 */
     readonly status?: SessionStatus
   },

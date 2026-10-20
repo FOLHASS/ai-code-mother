@@ -1,8 +1,8 @@
 import { computed } from 'vue'
 import type { MenuProps } from 'ant-design-vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
-import type { PageDependencies } from '@/shared/ports.ts'
-import type { UserRepository } from '../api/UserApiClient.ts'
+import type { ControllerCommonContext } from '@/shared/ports.ts'
+import type { UserApi } from '../api/UserApiClient.ts'
 import { errorMessage } from '@/shared/api/errors.ts'
 
 /** 管理全局导航菜单及当前用户操作。 */
@@ -32,9 +32,9 @@ export class GlobalHeaderController {
   /** 接收全局导航控制器运行所需的依赖并初始化状态。 */
   constructor(
     /** 提供页面级会话、路由和通知依赖。 */
-    private readonly dependencies: PageDependencies,
+    private readonly dependencies: ControllerCommonContext,
     /** 提供控制器所需的后端接口操作。 */
-    private readonly api: Pick<UserRepository, 'logout'>,
+    private readonly api: Pick<UserApi, 'logout'>,
     /** 提供当前页面的路由参数和查询条件。 */
     private readonly route: Pick<RouteLocationNormalizedLoaded, 'path' | 'fullPath'>,
     /** 根据当前路由计算导航菜单选中项的函数。 */

@@ -1,8 +1,8 @@
 import { appPermissionPolicy } from '@/features/app-management'
 import { errorMessage } from '@/shared/api/errors.ts'
-import type { PageDependencies } from '@/shared/ports.ts'
-import type { AppRepository } from '@/features/app-management'
-import type { AppSummary } from '@/shared/domain/models.ts'
+import type { ControllerCommonContext } from '@/shared/ports.ts'
+import type { AppApi } from '@/features/app-management'
+import type { AppInfo } from '@/shared/domain/models.ts'
 import { readonly, computed, ref } from 'vue'
 
 import type { HomeAppsController } from './HomeAppsController.ts'
@@ -29,7 +29,7 @@ export class HomePageController {
   /** 只读暴露用户创建操作是否正在执行。 */
   readonly isCreating = readonly(this.isCreatingState)
   /** 保存编辑弹窗当前选中应用的内部状态。 */
-  private readonly editingAppState = ref<AppSummary | null>(null)
+  private readonly editingAppState = ref<AppInfo | null>(null)
   /** 只读暴露当前在弹窗中编辑的应用。 */
   readonly editingApp = readonly(this.editingAppState)
   /** 保存显示编辑弹窗的内部响应状态。 */
@@ -46,9 +46,9 @@ export class HomePageController {
     /** 只读暴露当前应用列表。 */
     private readonly apps: HomeAppsController,
     /** 提供页面级会话、路由和通知依赖。 */
-    private readonly dependencies: PageDependencies,
+    private readonly dependencies: ControllerCommonContext,
     /** 提供控制器所需的后端接口操作。 */
-    private readonly api: Pick<AppRepository, 'add' | 'delete'>,
+    private readonly api: Pick<AppApi, 'add' | 'delete'>,
   ) {}
 
   /**
@@ -81,12 +81,12 @@ export class HomePageController {
   }
 
   /** 导航到应用详情或聊天页面。 */
-  openApp = (app: AppSummary): void => {
+  openApp = (app: AppInfo): void => {
     if (app.id) void this.router.push(`/app/${app.id}`)
   }
 
   /** 打开应用编辑流程。 */
-  editApp = (app: AppSummary): void => {
+  editApp = (app: AppInfo): void => {
     if (!app.id) return
     if (
       !appPermissionPolicy.evaluate(
@@ -102,7 +102,7 @@ export class HomePageController {
   }
 
   /** 执行应用删除并处理删除后的页面状态。 */
-  removeApp = (app: AppSummary): void => {
+  removeApp = (app: AppInfo): void => {
     if (!app.id) return
     this.dependencies.confirm({
       title: '删除这个应用？',
@@ -115,7 +115,7 @@ export class HomePageController {
   }
 
   /** 删除指定应用并同步更新列表。 */
-  private deleteApp = async (app: AppSummary): Promise<void> => {
+  private deleteApp = async (app: AppInfo): Promise<void> => {
     if (this.disposed) return
     try {
       await this.api.delete({ id: app.id })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AppSummary } from '@/shared/domain/models.ts'
+import type { AppInfo } from '@/shared/domain/models.ts'
 /**
  * 作品卡片：展示封面、名称、作者和创建时间，并通过事件把查看、编辑、删除交给调用页面。
  * 封面浮层左侧始终显示“查看对话”，右侧仅在存在部署地址时显示“查看作品”。
@@ -19,7 +19,7 @@ type AppCardVariant = 'workspace' | 'featured'
 // app 来自列表接口并包含 user VO；组件只读此对象，不在内部请求详情或修改业务字段。
 const props = withDefaults(
   defineProps<{
-    app: AppSummary
+    app: AppInfo
     variant?: AppCardVariant
     // 作为工作区卡片操作菜单的额外开关；即使为 true，精选卡片仍不会显示编辑/删除菜单。
     showActions?: boolean
@@ -37,9 +37,9 @@ const authorName = computed(
 
 // 事件均携带当前 app，父页面决定路由、权限校验、弹窗及删除后刷新，卡片不复制这些流程。
 const emit = defineEmits<{
-  open: [app: AppSummary]
-  edit: [app: AppSummary]
-  remove: [app: AppSummary]
+  open: [app: AppInfo]
+  edit: [app: AppInfo]
+  remove: [app: AppInfo]
 }>()
 
 /**

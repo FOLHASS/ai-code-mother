@@ -1,6 +1,6 @@
 import { delay } from '@/shared/async/delay.ts'
 import { readonly, ref, type Ref } from 'vue'
-import type { AppSummary } from '@/shared/domain/models.ts'
+import type { AppInfo } from '@/shared/domain/models.ts'
 import type { PreviewRepository } from './PreviewRepositoryService.ts'
 import { LatestRequest } from '@/shared/async/LatestRequest.ts'
 
@@ -28,11 +28,11 @@ export class PreviewService {
   /** 接收网站预览服务运行所需的依赖并初始化状态。 */
   constructor(
     /** 保存当前正在处理的应用数据。 */
-    private readonly app: Readonly<Ref<AppSummary | null>>,
+    private readonly app: Readonly<Ref<AppInfo | null>>,
     /** 获取当前会话版本，用来丢弃过期的预览检测结果。 */
     private readonly getVersion: () => number,
     /** 提供预览资源查询能力。 */
-    private readonly repository: PreviewRepository,
+    private readonly previewApi: PreviewRepository,
   ) {}
   /** 清空预览地址、错误和检查状态。 */
   reset = (): void => {
@@ -47,7 +47,7 @@ export class PreviewService {
     if (!this.app.value) return
     const version = this.getVersion()
     const request = this.request.begin()
-    const url = this.repository.getUrl(this.app.value, cacheBust)
+    const url = this.previewApi.getUrl(this.app.value, cacheBust)
     if (!url) {
       this.url.value = ''
       this.generated.value = false
@@ -58,10 +58,10 @@ export class PreviewService {
     this.checking.value = true
     this.error.value = ''
     try {
-      let response = await this.repository.checkReady(url, request.signal)
+      let response = await this.previewApi.checkReady(url, request.signal)
       for (let attempt = 0; cacheBust && response.status === 404 && attempt < 2; attempt++) {
         await delay(400 * (attempt + 1), request.signal)
-        response = await this.repository.checkReady(url, request.signal)
+        response = await this.previewApi.checkReady(url, request.signal)
       }
       if (version !== this.getVersion() || !request.isCurrent()) return
       if (!response.ok)

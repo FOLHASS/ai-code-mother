@@ -1,6 +1,12 @@
+/**
+ * 业务ID的类型 全局定义
+ */
 export type EntityId = string
 
-export type UserSummary = {
+/**
+ * 用户信息接口
+ */
+export type UserInfo = {
   id?: EntityId
   userAccount?: string
   userName?: string
@@ -11,9 +17,14 @@ export type UserSummary = {
   updateTime?: string
 }
 
-export type SessionUser = UserSummary
-
-export type AppSummary = {
+/**
+ * 供业务使用的数据接口
+ */
+export type SessionUserInfo = UserInfo
+/**
+ * 应用信息接口
+ */
+export type AppInfo = {
   id: EntityId
   appName?: string
   cover?: string
@@ -26,9 +37,12 @@ export type AppSummary = {
   editTime?: string
   createTime?: string
   updateTime?: string
-  user?: UserSummary
+  user?: UserInfo
 }
 
+/**
+ * 分页查询接口
+ */
 export type PageQuery = {
   pageNum?: number
   pageSize?: number
@@ -36,6 +50,9 @@ export type PageQuery = {
   sortOrder?: string
 }
 
+/**
+ * 分页查询的放回数据类型
+ */
 export type PageResult<T> = {
   records: T[]
   totalRow: number
@@ -44,6 +61,9 @@ export type PageResult<T> = {
   totalPage?: number
 }
 
+/**
+ * 应用查询接口
+ */
 export type AppQuery = PageQuery & {
   id?: EntityId
   userId?: EntityId
@@ -59,11 +79,14 @@ export type AppUpdate = { id?: EntityId; appName?: string; cover?: string; prior
 export type AppCreate = { initPrompt?: string }
 export type UserLogin = { userAccount?: string; userPassword?: string }
 export type UserRegister = UserLogin & { checkPassword?: string }
-export type UserCreate = Omit<UserSummary, 'id' | 'createTime' | 'updateTime'>
-export type UserUpdate = Omit<UserSummary, 'userAccount' | 'createTime' | 'updateTime'>
+export type UserCreate = Omit<UserInfo, 'id' | 'createTime' | 'updateTime'>
+export type UserUpdate = Omit<UserInfo, 'userAccount' | 'createTime' | 'updateTime'>
 export type UserQuery = PageQuery &
-  Pick<UserSummary, 'id' | 'userName' | 'userAccount' | 'userProfile' | 'userRole'>
+  Pick<UserInfo, 'id' | 'userName' | 'userAccount' | 'userProfile' | 'userRole'>
 
+/**
+ * 聊天信息的接口
+ */
 export type ChatHistoryRecord = {
   id?: EntityId
   appId?: EntityId

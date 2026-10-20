@@ -1,58 +1,61 @@
 import { errorMessage } from '@/shared/api/errors.ts'
 import { USER_ROLE, FEATURED_PRIORITY } from '@/shared/domain/constants.ts'
 import { LatestRequest } from '@/shared/async/LatestRequest.ts'
-import type { PageDependencies } from '@/shared/ports.ts'
-import type { AppRepository } from '../api/AppApiClient.ts'
-import type { AppQuery, AppSummary } from '@/shared/domain/models.ts'
+import type { ControllerCommonContext } from '@/shared/ports.ts'
+import type { AppApi } from '../api/AppApiClient.ts'
+import type { AppQuery, AppInfo } from '@/shared/domain/models.ts'
 import { readonly, computed, reactive, ref } from 'vue'
 
 /** 管理后台应用筛选、分页、详情选择和操作流程。 */
 export class AdminAppManageController {
-  /** 跟踪并取消过期请求，避免旧响应覆盖新状态。 */
-  private readonly requests = new LatestRequest()
-  /** 标记控制器是否已清理，阻止离页后继续更新状态。 */
+  // 跟踪并取消过期请求，避免旧响应覆盖新状态。
+  /**
+   * 请求时效管理器：同一组请求中，只有最后一次发起的请求可以更新页面状态。
+   */
+  readonly requests = new LatestRequest()
+  // 标记控制器是否已清理，阻止离页后继续更新状态
   private disposed = false
   /** 提供当前应用的路由对象。 */
   get router() {
-    return this.dependencies.router
+    return this.controllerContext.router
   }
   /** 提供当前登录用户状态仓库。 */
   private get store() {
-    return this.dependencies.session
+    return this.controllerContext.session
   }
   /** 提供界面通知能力。 */
   private get notify() {
-    return this.dependencies.notify
+    return this.controllerContext.notify
   }
 
-  /** 保存列表数据的内部加载状态。 */
+  // 保存列表数据的内部加载状态
   private readonly isLoadingState = ref(false)
-  /** 只读暴露列表数据是否正在加载。 */
+  // 只读暴露列表数据是否正在加载
   readonly isLoading = readonly(this.isLoadingState)
-  /** 保存当前页码的内部状态。 */
+  // 保存当前页码的内部状态
   private readonly currentPageState = ref(1)
-  /** 只读暴露当前页码。 */
+  // 只读暴露当前页码
   readonly currentPage = readonly(this.currentPageState)
-  /** 保存每页最多显示的记录数量。 */
+  // 保存每页最多显示的记录数量
   readonly pageSize = 10
-  /** 保存查询结果总数的内部状态。 */
+  // 保存查询结果总数的内部状态
   private readonly totalState = ref(0)
-  /** 只读暴露当前查询结果总数。 */
+  // 只读暴露当前查询结果总数
   readonly total = readonly(this.totalState)
-  /** 保存应用列表的内部状态。 */
-  private readonly appsState = ref<AppSummary[]>([])
-  /** 只读暴露当前应用列表。 */
+  // 保存应用列表的内部状态
+  private readonly appsState = ref<AppInfo[]>([])
+  // 只读暴露当前应用列表
   readonly apps = readonly(this.appsState)
-  /** 保存当前选中应用的内部状态。 */
-  private readonly selectedAppState = ref<AppSummary | null>(null)
-  /** 只读暴露当前选中的应用。 */
+  // 保存当前选中应用的内部状态
+  private readonly selectedAppState = ref<AppInfo | null>(null)
+  // 只读暴露当前选中的应用
   readonly selectedApp = readonly(this.selectedAppState)
-  /** 保存详情弹窗的内部显示状态。 */
+  // 保存详情弹窗的内部显示状态
   private readonly showDetailsModalState = ref(false)
   /** 只读暴露详情弹窗的显示状态。 */
   readonly showDetailsModal = readonly(this.showDetailsModalState)
   /** 保存当前编辑目标，独立于详情弹窗选择。 */
-  private readonly editingAppState = ref<AppSummary | null>(null)
+  private readonly editingAppState = ref<AppInfo | null>(null)
   /** 对外只读暴露当前编辑目标。 */
   readonly editingApp = readonly(this.editingAppState)
   /** 保存编辑弹窗显隐，避免编辑时离开当前分页。 */
@@ -80,9 +83,9 @@ export class AdminAppManageController {
   /** 接收管理端应用管理控制器运行所需的依赖并初始化状态。 */
   constructor(
     /** 提供页面级会话、路由和通知依赖。 */
-    private readonly dependencies: PageDependencies,
+    private readonly controllerContext: ControllerCommonContext,
     /** 提供控制器所需的后端接口操作。 */
-    private readonly api: Pick<AppRepository, 'adminListVoByPage' | 'adminUpdate' | 'adminDelete'>,
+    private readonly api: Pick<AppApi, 'adminListVoByPage' | 'adminUpdate' | 'adminDelete'>,
   ) {}
 
   /** 加载管理端应用列表并更新分页状态。 */
@@ -156,7 +159,7 @@ export class AdminAppManageController {
   }
 
   /** 切换应用的精选展示状态。 */
-  featureApp = async (app: AppSummary): Promise<void> => {
+  featureApp = async (app: AppInfo): Promise<void> => {
     if (this.disposed) return
     if (!app.id) return
     try {
@@ -171,9 +174,9 @@ export class AdminAppManageController {
   }
 
   /** 删除当前应用并处理删除后的导航或刷新。 */
-  removeApp = (app: AppSummary): void => {
+  removeApp = (app: AppInfo): void => {
     if (!app.id) return
-    this.dependencies.confirm({
+    this.controllerContext.confirm({
       title: '确认删除应用？',
       content: `删除后将无法恢复“${app.appName || '未命名应用'}”。`,
       okText: '确认删除',
@@ -184,18 +187,18 @@ export class AdminAppManageController {
   }
 
   /** 打开指定聊天记录的详情视图。 */
-  openDetails = (app: AppSummary): void => {
+  openDetails = (app: AppInfo): void => {
     this.selectedAppState.value = app
     this.showDetailsModalState.value = true
   }
 
   /** 导航到应用详情或聊天页面。 */
-  openApp = (app: AppSummary): void => {
+  openApp = (app: AppInfo): void => {
     if (app.id) void this.router.push(`/app/${app.id}`)
   }
 
   /** 关闭详情视图，并在当前列表上打开应用编辑弹窗。 */
-  editApp = (app: AppSummary): void => {
+  editApp = (app: AppInfo): void => {
     if (this.disposed || !app.id || !this.isAdmin.value) return
     this.showDetailsModalState.value = false
     this.editingAppState.value = app
@@ -209,14 +212,14 @@ export class AdminAppManageController {
   }
 
   /** 同步详情快照并按原有页码、筛选条件刷新管理列表。 */
-  handleAppSaved = (app: AppSummary): void => {
+  handleAppSaved = (app: AppInfo): void => {
     if (this.disposed) return
     if (this.selectedAppState.value?.id === app.id) this.selectedAppState.value = app
     void this.loadApps()
   }
 
   /** 删除指定应用并同步更新列表。 */
-  private deleteApp = async (app: AppSummary): Promise<void> => {
+  private deleteApp = async (app: AppInfo): Promise<void> => {
     if (this.disposed) return
     try {
       await this.api.adminDelete({ id: app.id })

@@ -1,12 +1,12 @@
 import { readonly, ref, type Ref } from 'vue'
-import type { AppSummary } from '@/shared/domain/models.ts'
+import type { AppInfo } from '@/shared/domain/models.ts'
 import type { Notifier } from '@/shared/ports.ts'
-import type { AppRepository } from '../api/AppApiClient.ts'
+import type { AppApi } from '../api/AppApiClient.ts'
 import type { ArchiveResponse } from '@/shared/ui/downloadArchive.ts'
 import { errorMessage } from '@/shared/api/errors.ts'
 
 export type AppActionsContext = {
-  app: Readonly<Ref<AppSummary | null>>
+  app: Readonly<Ref<AppInfo | null>>
   canDeploy: Readonly<Ref<boolean>>
   canDownload: Readonly<Ref<boolean>>
   isStreaming: Readonly<Ref<boolean>>
@@ -31,7 +31,7 @@ export class AppActionService {
     /** 提供当前业务流程使用的共享状态和回调。 */
     private readonly context: AppActionsContext,
     /** 提供控制器所需的后端接口操作。 */
-    private readonly api: Pick<AppRepository, 'deploy' | 'downloadCode'>,
+    private readonly api: Pick<AppApi, 'deploy' | 'downloadCode'>,
     /** 提供成功、失败等界面通知能力。 */
     private readonly notify: Notifier,
     /** 保存下载归档的异步操作。 */

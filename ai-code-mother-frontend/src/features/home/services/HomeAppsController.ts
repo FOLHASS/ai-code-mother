@@ -1,8 +1,8 @@
 import { errorMessage } from '@/shared/api/errors.ts'
 import { LatestRequest } from '@/shared/async/LatestRequest.ts'
-import type { PageDependencies } from '@/shared/ports.ts'
-import type { AppRepository } from '@/features/app-management'
-import type { AppSummary } from '@/shared/domain/models.ts'
+import type { ControllerCommonContext } from '@/shared/ports.ts'
+import type { AppApi } from '@/features/app-management'
+import type { AppInfo } from '@/shared/domain/models.ts'
 import { readonly, computed, ref } from 'vue'
 
 /**
@@ -38,11 +38,11 @@ export class HomeAppsController {
   /** 只读暴露精选应用列表是否正在加载。 */
   readonly isGoodLoading = readonly(this.isGoodLoadingState)
   /** 保存my应用的内部响应状态。 */
-  private readonly myAppsState = ref<AppSummary[]>([])
+  private readonly myAppsState = ref<AppInfo[]>([])
   /** 只读暴露当前用户的应用列表。 */
   readonly myApps = readonly(this.myAppsState)
   /** 保存首页精选应用列表的内部状态。 */
-  private readonly goodAppsState = ref<AppSummary[]>([])
+  private readonly goodAppsState = ref<AppInfo[]>([])
   /** 只读暴露首页精选应用列表。 */
   readonly goodApps = readonly(this.goodAppsState)
   /** 保存my总数的内部响应状态。 */
@@ -77,9 +77,9 @@ export class HomeAppsController {
   /** 接收首页应用列表控制器运行所需的依赖并初始化状态。 */
   constructor(
     /** 提供页面级会话、路由和通知依赖。 */
-    private readonly dependencies: PageDependencies,
+    private readonly dependencies: ControllerCommonContext,
     /** 提供控制器所需的后端接口操作。 */
-    private readonly api: Pick<AppRepository, 'listMyVoByPage' | 'listGoodVoByPage'>,
+    private readonly api: Pick<AppApi, 'listMyVoByPage' | 'listGoodVoByPage'>,
   ) {}
 
   /** 加载当前用户的应用列表。 */
@@ -140,8 +140,8 @@ export class HomeAppsController {
   }
 
   /** 处理应用保存完成后的列表刷新。 */
-  handleAppSaved = (updatedApp: AppSummary): void => {
-    const updateApp = (app: AppSummary) =>
+  handleAppSaved = (updatedApp: AppInfo): void => {
+    const updateApp = (app: AppInfo) =>
       app.id === updatedApp.id ? { ...app, ...updatedApp } : app
     this.myAppsState.value = this.myAppsState.value.map(updateApp)
     this.goodAppsState.value = this.goodAppsState.value.map(updateApp)

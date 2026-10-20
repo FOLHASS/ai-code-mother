@@ -1,12 +1,12 @@
 import { readonly, ref, type Ref } from 'vue'
-import type { AppSummary, ChatHistoryRecord } from '@/shared/domain/models.ts'
+import type { AppInfo, ChatHistoryRecord } from '@/shared/domain/models.ts'
 import type { ChatHistoryRepository } from '../api/ChatHistoryApiClient.ts'
 import { ChatHistoryMapperService } from './ChatHistoryMapperService.ts'
 import { LatestRequest } from '@/shared/async/LatestRequest.ts'
 import { errorMessage } from '@/shared/api/errors.ts'
 
 export type ChatHistoryContext = {
-  app: Readonly<Ref<AppSummary | null>>
+  app: Readonly<Ref<AppInfo | null>>
   canReadHistory: Readonly<Ref<boolean>>
   getVersion: () => number
 }

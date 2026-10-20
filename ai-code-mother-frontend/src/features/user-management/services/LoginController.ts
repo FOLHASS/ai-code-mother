@@ -1,8 +1,8 @@
 import { computed, reactive, readonly, ref } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { UserLogin } from '@/shared/domain/models.ts'
-import type { PageDependencies } from '@/shared/ports.ts'
-import type { UserRepository } from '../api/UserApiClient.ts'
+import type { ControllerCommonContext } from '@/shared/ports.ts'
+import type { UserApi } from '../api/UserApiClient.ts'
 import { safeRedirect } from '@/shared/routing/redirect.ts'
 import { errorMessage } from '@/shared/api/errors.ts'
 
@@ -28,9 +28,9 @@ export class LoginController {
     /** 提供当前页面的路由参数和查询条件。 */
     private readonly route: Pick<RouteLocationNormalizedLoaded, 'query'>,
     /** 提供页面级会话、路由和通知依赖。 */
-    private readonly dependencies: PageDependencies,
+    private readonly dependencies: ControllerCommonContext,
     /** 提供控制器所需的后端接口操作。 */
-    private readonly api: Pick<UserRepository, 'login'>,
+    private readonly api: Pick<UserApi, 'login'>,
     /** 保存服务端应用来源地址。 */
     private readonly origin?: string,
     /** 配置登录成功后回跳地址允许使用的应用根路径。 */

@@ -1,14 +1,14 @@
 import type {
-  AppSummary,
+  AppInfo,
   ChatHistoryRecord,
   PageResult,
-  UserSummary,
+  UserInfo,
 } from '@/shared/domain/models.ts'
 import { ApiError } from './errors.ts'
 import { entityId, optionalId } from './adapter.ts'
 
 /** 仅把领域模型需要的字段映射到应用状态，隔离接口额外字段。 */
-export function mapUser(value: API.UserVO | API.LoginUserVO): UserSummary {
+export function mapUser(value: API.UserVO | API.LoginUserVO): UserInfo {
   return {
     id: optionalId(value.id),
     userAccount: value.userAccount,
@@ -22,7 +22,7 @@ export function mapUser(value: API.UserVO | API.LoginUserVO): UserSummary {
 }
 
 /** 把应用接口数据转换为前端领域模型。 */
-export function mapApp(value: API.AppVO): AppSummary {
+export function mapApp(value: API.AppVO): AppInfo {
   return {
     id: entityId(value.id),
     userId: optionalId(value.userId),
@@ -87,7 +87,7 @@ export function mapPage<T, U>(
 }
 
 /** 把登录用户接口数据转换为会话用户模型。 */
-export function mapSessionUser(value: API.LoginUserVO): UserSummary {
+export function mapSessionUser(value: API.LoginUserVO): UserInfo {
   const user = mapUser(value)
   if (!user.id) throw new ApiError('服务端返回的登录用户信息不完整')
   return user

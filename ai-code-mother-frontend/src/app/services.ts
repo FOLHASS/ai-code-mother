@@ -4,9 +4,17 @@ import { UserApiClient } from '@/features/user-management/api'
 import { ChatHistoryApiClient } from '@/features/ai-chat/api/ChatHistoryApiClient.ts'
 import type { Notifier, Confirmation } from '@/shared/ports.ts'
 
+
+/**
+ * 统一初始化全局的各个模块的接口客户端
+ */
 export const appApi = new AppApiClient()
 export const userApi = new UserApiClient()
 export const chatHistoryApi = new ChatHistoryApiClient()
+
+/**
+ * 全局可调用的通知器-封装atd的message对象
+ */
 export const notifier: Notifier = {
   success: (text) => {
     void message.success(text)

@@ -1,7 +1,7 @@
 import { reactive, readonly, ref } from 'vue'
 import type { UserUpdate } from '@/shared/domain/models.ts'
-import type { PageDependencies } from '@/shared/ports.ts'
-import type { UserRepository } from '../api/UserApiClient.ts'
+import type { ControllerCommonContext } from '@/shared/ports.ts'
+import type { UserApi } from '../api/UserApiClient.ts'
 import { errorMessage } from '@/shared/api/errors.ts'
 
 /** 管理个人资料编辑表单的重置、保存和清理。 */
@@ -18,9 +18,9 @@ export class ProfileEditorController {
   /** 接收个人资料编辑控制器运行所需的依赖并初始化状态。 */
   constructor(
     /** 提供页面级会话、路由和通知依赖。 */
-    private readonly dependencies: PageDependencies,
+    private readonly dependencies: ControllerCommonContext,
     /** 提供控制器所需的后端接口操作。 */
-    private readonly api: Pick<UserRepository, 'update'>,
+    private readonly api: Pick<UserApi, 'update'>,
   ) {
     this.reset()
   }

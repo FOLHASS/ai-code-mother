@@ -1,2 +1,2 @@
 export { UserApiClient } from './UserApiClient.ts'
-export type { UserRepository } from './UserApiClient.ts'
+export type { UserApi } from './UserApiClient.ts'

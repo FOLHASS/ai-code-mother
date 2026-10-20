@@ -1,8 +1,18 @@
 import type { AxiosResponse } from 'axios'
 import { ApiError } from './errors.ts'
 
-export type ApiEnvelope<T> = { code?: number; data?: T; message?: string }
+/**
+ * 后端所有的接口返回的数据类戏ing
+ */
+export type BaseResponse<T> = { code?: number; data?: T; message?: string }
+/**
+ * axios 调用接口后得到数据结果， 能正确返回结构code一定为0
+ */
 export type ApiResult<T> = { data: { code: 0; data: T; message?: string } }
+
+/**
+ * signal： 实现请求终止，比如切换页面、等待AI回复响，未完成响应等接口 实现终止。
+ */
 export type RequestOptions = { signal?: AbortSignal; responseType?: 'blob' }
 
 /** 将生成接口中的数字 ID 兼容处理集中在传输适配边界。 */
@@ -32,9 +42,13 @@ export function optionalId(value: unknown): string | undefined {
   return value == null ? undefined : entityId(value)
 }
 
-/** 把接口响应适配为统一的业务结果。 */
+/**
+ * 把接口响应适配为统一的业务结果
+ * @param request
+ * @param map 实现将返回格式转化成需要的格式
+ */
 export async function adaptResponse<T, U>(
-  request: Promise<AxiosResponse<ApiEnvelope<T>>>,
+  request: Promise<AxiosResponse<BaseResponse<T>>>,
   map: (data: T) => U,
 ): Promise<ApiResult<U>> {
   const response = await request

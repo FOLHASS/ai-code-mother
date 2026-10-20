@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AppSummary } from '@/shared/domain/models.ts'
+import type { AppInfo } from '@/shared/domain/models.ts'
 /**
  * 对话工作台顶部：显示应用标题、点击展开的详情，以及查看部署、下载和部署入口。
  * 所有业务操作通过 emits 上报；组件只持有详情浮层的开关状态，不直接调用应用接口。
@@ -15,7 +15,7 @@ import logoUrl from '@/assets/logo-display.png'
 
 /** 父层提供应用快照、可操作权限及各操作的独立状态；previewUrl 用于判断是否已有可部署预览。 */
 const props = defineProps<{
-  app: AppSummary | null
+  app: AppInfo | null
   title: string
   deployedUrl: string
   hasApp: boolean

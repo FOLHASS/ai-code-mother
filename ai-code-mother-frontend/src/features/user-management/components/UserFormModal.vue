@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { UserCreate, UserSummary, UserUpdate } from '@/shared/domain/models.ts'
+import type { UserCreate, UserInfo, UserUpdate } from '@/shared/domain/models.ts'
 /**
  * 创建与编辑用户共用的表单弹窗：本地维护草稿，Props 决定模式、开关、加载态和待编辑用户。
  * 窗口打开时回填或重置草稿；提交只触发 submit，取消只触发 close，请求和关闭策略由父级负责。
@@ -18,7 +18,7 @@ const props = withDefaults(
     // mode 同时决定标题、确认文案、回填方式和提交字段。
     mode: 'create' | 'edit'
     loading: boolean
-    user?: UserSummary | null
+    user?: UserInfo | null
   }>(),
   { user: null },
 )

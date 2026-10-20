@@ -1,5 +1,5 @@
 export { AppApiClient } from './api/AppApiClient.ts'
-export type { AppRepository } from './api/AppApiClient.ts'
+export type { AppApi } from './api/AppApiClient.ts'
 export { AppActionService } from './services/AppActionService.ts'
 export type { AppActionsContext } from './services/AppActionService.ts'
 export { AppEditModalController } from './services/AppEditModalController.ts'

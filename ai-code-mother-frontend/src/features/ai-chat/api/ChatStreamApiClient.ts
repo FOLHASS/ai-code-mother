@@ -7,6 +7,7 @@ import { ChatProtocolAdapterService } from '../services/ChatProtocolAdapterServi
 
 export type ChatStreamParams = { appId: string; message: string }
 export type ChatStreamPort = {
+  // signal 用于实现中断流式请求，避免浪费服务器资源
   stream: (params: ChatStreamParams, signal?: AbortSignal) => AsyncGenerator<ChatStreamMessage>
 }
 

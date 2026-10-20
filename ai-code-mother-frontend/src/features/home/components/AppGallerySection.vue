@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AppSummary } from '@/shared/domain/models.ts'
+import type { AppInfo } from '@/shared/domain/models.ts'
 /**
  * 首页通用作品区：按“未登录 → 加载中 → 列表或空态”顺序展示内容，并提供上一页/下一页。
  * 头部和未登录提示由具名插槽定制；列表请求、实际路由和修改操作均交给父页面。
@@ -12,7 +12,7 @@ import { AppCard } from '@/features/app-management/components'
 const props = withDefaults(
   defineProps<{
     // 后端 VO 已包含卡片所需应用信息及作者信息，直接传给 AppCard。
-    apps: readonly AppSummary[]
+    apps: readonly AppInfo[]
     total: number
     page: number
     pageSize: number
@@ -27,9 +27,9 @@ const props = withDefaults(
 
 // 卡片事件携带原应用对象向上透传；page-change 只报告目标页，父级负责请求并回传新数据。
 const emit = defineEmits<{
-  open: [app: AppSummary]
-  edit: [app: AppSummary]
-  remove: [app: AppSummary]
+  open: [app: AppInfo]
+  edit: [app: AppInfo]
+  remove: [app: AppInfo]
   'page-change': [page: number]
 }>()
 // 即使没有记录也保留最少一页的计算结果，分页区域本身只在总数大于每页数量时显示。
